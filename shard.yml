@@ -10,6 +10,8 @@ authors:
 dependencies:
   sqlite3:
     github: crystal-lang/crystal-sqlite3
+  admiral:
+    github: jwaldrip/admiral.cr
 
 targets:
   datset:

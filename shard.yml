@@ -1,0 +1,18 @@
+name: datset
+version: 0.1.0
+
+authors:
+  - Yacine Petitprez <anykeyh@gmail.com>
+
+# description: |
+#   Short description of datset
+
+dependencies:
+  sqlite3:
+    github: crystal-lang/crystal-sqlite3
+
+targets:
+  datset:
+    main: src/datset.cr
+
+license: MPL

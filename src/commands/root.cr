@@ -21,11 +21,18 @@ module Commands
     # register_sub_command media    : Commands::Media::Root
 
     # register_sub_command version  : Commands::Version
+    define_help
+
+    rescue_from(Exception) do |e|
+      STDERR.puts e.message
+      puts
+      puts help
+      exit -1
+    end
 
     def run
-      puts "Usage: datset -f <filename> <command> [options]"
-      puts "filename: #{flags.filename}"
-      puts_help
+      puts help
+      exit -1
     end
 
     def self.start

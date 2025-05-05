@@ -9,7 +9,7 @@ module Data
 
     def with_db(create = false, &block : DB::Database -> T) : T forall T
       if !create && !File.exists?(@db)
-        puts "ERR: Database file `#{@db}` does not exist. Use init to create it."
+        Log.fatal{ "Database file `#{@db}` does not exist. Use init to create it." }
         exit -404 # file not found :o)
       end
 
@@ -19,12 +19,14 @@ module Data
         db.exec("PRAGMA application_id = 0x2fefd315")
         db.exec("PRAGMA journal_mode = WAL")
 
-        yield db
+        out = yield db
 
         # Set the analysis limit and optimize the database
         # After close.
         db.exec("PRAGMA analysis_limit=400")
         db.exec("PRAGMA optimize")
+
+        out
       end
     end
 

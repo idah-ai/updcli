@@ -11,7 +11,7 @@ module Data
     def list
       DB.open "sqlite3://./#{@db}" do |db|
         db.query("SELECT * FROM datasets") do |row|
-          puts row
+          Log.info{ row }
         end
       end
 

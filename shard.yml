@@ -11,7 +11,8 @@ dependencies:
   sqlite3:
     github: crystal-lang/crystal-sqlite3
   admiral:
-    github: jwaldrip/admiral.cr
+    github: anykeyh/admiral.cr
+    branch: master
 
 targets:
   datset:

@@ -9,8 +9,7 @@ module Commands
       end
 
       def run
-        puts "TODO: #{root.flags.filename}"
-        pp Data::Dataset.new(root.flags.filename).list
+        Data::Dataset.new(root.flags.filename).list
       end
     end
   end

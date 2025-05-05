@@ -8,6 +8,7 @@ module Commands
 
     def run
       Data::Init.new(root.flags.filename).call
+      Log.info{ "init #{root.flags.filename}" }
     end
   end
 end

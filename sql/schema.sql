@@ -11,19 +11,18 @@
 CREATE TABLE IF NOT EXISTS datasets (
     id TEXT PRIMARY KEY CHECK(length(id) <= 64),
     name TEXT NOT NULL,
-    topology TEXT NOT NULL, -- dataset topology, ex: imageset, video, etc.
-    metadata TEXT
+    topology TEXT NOT NULL, -- Data topology, ex: imageset, video, etc.
+    metadata TEXT           -- Such as allowed annotation types, domain specific data.
 ) STRICT;
 
 -- Table for media blobs
 CREATE TABLE IF NOT EXISTS medias (
     id TEXT PRIMARY KEY,
-    key TEXT, -- Key referencing the media if the media is a set of files. e.g. image.jpg/small
-    blob_data BLOB, -- Binary data for the media. Can be null, in case of media defined by metadata for example.
-    media_type TEXT, -- Mime type of media, e.g., image/jpeg, video/mp4. Optional
-    metadata TEXT NOT NULL -- Extra metadata. Useful for compound media types, such as lidar with images
+    key TEXT,                   -- Key referencing the media if the media is a set of files. e.g. image.jpg/small
+    blob_data BLOB,             -- Binary data for the media. Can be null, in case of media defined by metadata for example.
+    media_type TEXT,            -- Mime type of media, e.g., image/jpeg, video/mp4. Optional, can be NULL.
+    metadata TEXT NOT NULL      -- Metadata related to the file.
 ) STRICT;
-
 
 -- Set unique on id and key to avoid duplicates
 CREATE UNIQUE INDEX IF NOT EXISTS idx_media_id_key ON medias (id, key);
@@ -32,7 +31,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_media_id_key ON medias (id, key);
 CREATE TABLE IF NOT EXISTS entries (
     id TEXT PRIMARY KEY CHECK(length(id) <= 64),
     dataset_id TEXT NOT NULL REFERENCES datasets(id) ON DELETE CASCADE, -- Changed from UUID
-    media_url TEXT NOT NULL, -- Can be an external URL or datset://<media_identifier>
+    media_url TEXT NOT NULL,                                            -- Can be an external URL or datset://<media_identifier>
     metadata TEXT
 ) STRICT;
 
@@ -45,7 +44,7 @@ CREATE TABLE IF NOT EXISTS annotations (
     entry_id TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE, -- Changed FK type to TEXT
     type TEXT NOT NULL, -- Type of annotation, e.g., bounding_box, segmentation
     definition TEXT NOT NULL, -- Parameters defining the annotation, ex: [x1, y1, x2, y2]
-    metadata TEXT NOT NULL -- Other metadata, such as creator, timestamp, comments...
+    metadata TEXT NOT NULL -- Other metadata, such as creator, timestamp, comments... JSON format
 ) STRICT;
 
 -- Index on entry_id for faster filtering by entry

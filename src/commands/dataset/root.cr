@@ -13,14 +13,13 @@ module Commands
       end
 
       rescue_from(Exception) do |e|
-        STDERR.puts e.message
-        puts
-        puts help
+        Log.fatal { "#{e.message}\n" }
+        Log.fatal { help }
         exit -1
       end
 
       def run
-        puts help
+        Log.fatal { help }
         exit -1
       end
     end

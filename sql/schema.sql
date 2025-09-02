@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS annotations (
     id TEXT PRIMARY KEY CHECK(length(id) <= 64),
     entry_id TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE, -- Changed FK type to TEXT
     type TEXT NOT NULL, -- Type of annotation, e.g., bounding_box, segmentation
-    definition TEXT NOT NULL, -- Parameters defining the annotation, ex: [x1, y1, x2, y2]
+    dimensions TEXT NOT NULL, -- Parameters defining the annotation, ex: [x1, y1, x2, y2]
     category TEXT,
     metadata TEXT -- Other metadata, such as creator, timestamp, comments... JSON format
 ) STRICT;

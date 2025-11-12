@@ -1,14 +1,10 @@
 version: 2.0
 shards:
-  admiral:
-    git: https://github.com/anykeyh/admiral.cr.git
-    version: 1.12.1+git.commit.4ef999490355c54b88c38c14963d81e6829348dd
-
   db:
     git: https://github.com/crystal-lang/crystal-db.git
     version: 0.13.1
 
-  sqlite3:
-    git: https://github.com/crystal-lang/crystal-sqlite3.git
-    version: 0.21.0
+  duckdb:
+    git: https://github.com/amauryt/crystal-duckdb.git
+    version: 0.2.5
 

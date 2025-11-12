@@ -8,14 +8,12 @@ authors:
 #   Short description of datset
 
 dependencies:
-  sqlite3:
-    github: crystal-lang/crystal-sqlite3
-  admiral:
-    github: anykeyh/admiral.cr
-    branch: master
+  duckdb:
+    github: amauryt/crystal-duckdb
+    version: ~> 0.2.5
 
 targets:
-  datset:
+  updcli:
     main: src/datset.cr
 
 license: MPL

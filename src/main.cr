@@ -1,10 +1,13 @@
-require "admiral"
-
-require "./commands/**"
-require "./data/**"
-
+require "./command/**"
 require "log"
 
 Log.define_formatter LogFormat, "#{severity} | #{message}"
 
-Commands::Root.start
+Command::Parser.parse(ARGV).tap do |args|
+  command = Command::Root.new(args)
+  command.run
+rescue e : Command::Error
+  STDERR.puts e.message
+  e.command.print_help
+  exit 1
+end

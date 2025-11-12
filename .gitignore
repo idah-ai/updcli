@@ -1,4 +1,6 @@
 # Testing data
-*.datset
+*.upd
 lib
 lib/*
+
+.vscode

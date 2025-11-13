@@ -553,7 +553,7 @@ If you extend the Core Schema, publish clear documentation at the URL specified 
 
 ### 7.4. Media Integrity
 
-While UPD signatures cover data tables, media integrity should be verified separately:
+While UPD signatures cover data tables, media integrity could be verified separately:
 - Store checksums in `medias.metadata` (e.g., `{"SHA256": "<hash>"}`)
 - Use media_type-specific integrity tools for validation
 

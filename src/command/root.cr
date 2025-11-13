@@ -6,6 +6,7 @@ module Command
       required: true,
       type: :string
     sub_command "init", Init
+    sub_command "append", Append
     sub_command "dataset", Dataset::Root
 
     property! database : DB::Connection

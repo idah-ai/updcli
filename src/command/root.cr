@@ -1,5 +1,3 @@
-require "duckdb"
-
 module Command
   class Root < Base
     description "updcli: A command-line tool for managing Universal Portable Datasets (UPD)."
@@ -8,6 +6,7 @@ module Command
       required: true,
       type: :string
     sub_command "init", Init
+    sub_command "dataset", Dataset::Root
 
     property! database : DB::Connection
 

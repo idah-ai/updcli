@@ -1,5 +1,7 @@
-require "./command/**"
+require "duckdb"
 require "log"
+
+require "./command/**"
 
 Log.define_formatter LogFormat, "#{severity} | #{message}"
 

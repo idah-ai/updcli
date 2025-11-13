@@ -39,12 +39,12 @@ module Command
     end
 
     # Access the parent command.
-    def parent(t : T.class = Command::Base) : T? forall T
+    def parent(t : T.class = Command::Base) forall T
       @root.as(T | Nil)
     end
 
     # Access the root command.
-    def root(t : T.class = Command::Base) : T forall T
+    def root(t : T.class = Command::Root) forall T
       if (root = @root)
         root.root(t)
       else

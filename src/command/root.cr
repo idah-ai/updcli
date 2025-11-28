@@ -8,6 +8,9 @@ module Command
     sub_command "init", Init
     sub_command "append", Append
     sub_command "dataset", Dataset::Root
+    sub_command "media", Media::Root
+    sub_command "entry", Entry::Root
+    sub_command "annotation", Annotation::Root
 
     property! database : DB::Connection
 

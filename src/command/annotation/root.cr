@@ -3,11 +3,10 @@ require "./show"
 require "./delete"
 
 module Command
-  module Dataset
+  module Annotation
     class Root < Base
-      description "Manage datasets within this UPD"
+      description "Manage annotations within this UPD"
       sub_command "list", List
-      sub_command "create", Create
       sub_command "show", Show
       sub_command "delete", Delete
 

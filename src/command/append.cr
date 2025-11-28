@@ -23,52 +23,52 @@ module Command
       append_commands = [
         [
           "dataset:create",
-          ->(args: Array(Argument)) {Command::Dataset::Create.new(args).run_impl}
+          ->(args: Array(Argument)) {Command::Dataset::Create.new(args, self.root).run_impl}
         ],
         [
           "dataset:delete",
-          ->(args: Array(Argument)) {Command::Dataset::Delete.new(args).run_impl}
+          ->(args: Array(Argument)) {Command::Dataset::Delete.new(args, self.root).run_impl}
         ],
-        [
-          "dataset:update",
-          ->(args: Array(Argument)) {Command::Dataset::Update.new(args).run_impl}
-        ],
-        [
-          "entry:create",
-          ->(args: Array(Argument)) {Command::Entry::Create.new(args).run_impl}
-        ],
+        # [
+        #   "dataset:update",
+        #   ->(args: Array(Argument)) {Command::Dataset::Update.new(args, self.root).run_impl}
+        # ],
+        # [
+        #   "entry:create",
+        #   ->(args: Array(Argument)) {Command::Entry::Create.new(args, self.root).run_impl}
+        # ],
         [
           "entry:delete",
-          ->(args: Array(Argument)) {Command::Entry::Delete.new(args).run_impl}
+          ->(args: Array(Argument)) {Command::Entry::Delete.new(args, self.root).run_impl}
         ],
-        [
-          "entry:update",
-          ->(args: Array(Argument)) {Command::Entry::Update.new(args).run_impl}
-        ],
+        # [
+        #   "entry:update",
+        #   ->(args: Array(Argument)) {Command::Entry::Update.new(args, self.root).run_impl}
+        # ],
         [
           "media:create",
-          ->(args: Array(Argument)) {Command::Media::Create.new(args).run_impl}
+          ->(args: Array(Argument)) {Command::Media::Create.new(args, self.root).run_impl}
         ],
         [
           "media:delete",
-          ->(args: Array(Argument)) {Command::Media::Delete.new(args).run_impl}
+          ->(args: Array(Argument)) {Command::Media::Delete.new(args, self.root).run_impl}
         ],
-        [
-          "media:update",
-          ->(args: Array(Argument)) {Command::Media::Update.new(args).run_impl}
-        ],
-        [
-          "annotation:create",
-          ->(args: Array(Argument)) {Command::Annotation::Create.new(args).run_impl}
-        ],
+        # [
+        #   "media:update",
+        #   ->(args: Array(Argument)) {Command::Media::Update.new(args, self.root).run_impl}
+        # ],
+        # [
+        #   "annotation:create",
+        #   ->(args: Array(Argument)) {Command::Annotation::Create.new(args, self.root).run_impl}
+        # ],
         [
           "annotation:delete",
-          ->(args: Array(Argument)) {Command::Annotation::Delete.new(args).run_impl}
+          ->(args: Array(Argument)) {Command::Annotation::Delete.new(args, self.root).run_impl}
         ],
-        [
-          "annotation:update",
-          ->(args: Array(Argument)) {Command::Annotation::Update.new(args).run_impl}
-        ],
+        # [
+        #   "annotation:update",
+        #   ->(args: Array(Argument)) {Command::Annotation::Update.new(args, self.root).run_impl}
+        # ],
       ]
 
       File.open(input, "r") do |file|
@@ -88,7 +88,7 @@ module Command
             raise "command not found: #{appendInstruction.command} (line #{i})"
           else
             command[1]
-            .as(Proc(Hash(String, JSON::Any), Nil)) #...
+            .as(Proc(Array(Argument), Nil)) #...
             .call(
               appendInstruction.args.map do |k, v| # mapping from_json ?
                 Argument.new(k, :optlong, v.to_s)

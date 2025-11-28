@@ -23,98 +23,51 @@ module Command
       append_commands = [
         [
           "dataset:create",
-          ->(args: Hash(String, JSON::Any)) {
-            Command::Dataset::Create.new(
-              args.map do |k, v| Argument.new(k, :optlong, v.to_s) end
-            ).run_impl
-          }
+          ->(args: Array(Argument)) {Command::Dataset::Create.new(args).run_impl}
         ],
         [
           "dataset:delete",
-          ->(args: Hash(String, JSON::Any)) {
-            Command::Dataset::Delete.new(
-              args.map do |k, v| Argument.new(k, :optlong, v.to_s) end
-            ).run_impl
-          }
+          ->(args: Array(Argument)) {Command::Dataset::Delete.new(args).run_impl}
         ],
         [
           "dataset:update",
-          ->(args: Hash(String, JSON::Any)) {
-            Command::Dataset::Update.new(
-              args.map do |k, v| Argument.new(k, :optlong, v.to_s) end
-            ).run_impl
-          }
+          ->(args: Array(Argument)) {Command::Dataset::Update.new(args).run_impl}
         ],
         [
           "entry:create",
-          ->(args: Hash(String, JSON::Any)) {
-            Command::Entry::Create.new(
-              args.map do |k, v| Argument.new(k, :optlong, v.to_s) end
-            ).run_impl
-          }
+          ->(args: Array(Argument)) {Command::Entry::Create.new(args).run_impl}
         ],
         [
           "entry:delete",
-          ->(args: Hash(String, JSON::Any)) {
-            Command::Entry::Delete.new(
-              args.map do |k, v| Argument.new(k, :optlong, v.to_s) end
-            ).run_impl
-          }
+          ->(args: Array(Argument)) {Command::Entry::Delete.new(args).run_impl}
         ],
         [
           "entry:update",
-          ->(args: Hash(String, JSON::Any)) {
-            Command::Entry::Update.new(
-              args.map do |k, v| Argument.new(k, :optlong, v.to_s) end
-            ).run_impl
-          }
+          ->(args: Array(Argument)) {Command::Entry::Update.new(args).run_impl}
         ],
         [
           "media:create",
-          ->(args: Hash(String, JSON::Any)) {
-            Command::Media::Create.new(
-              args.map do |k, v| Argument.new(k, :optlong, v.to_s) end
-            ).run_impl }
+          ->(args: Array(Argument)) {Command::Media::Create.new(args).run_impl}
         ],
         [
           "media:delete",
-          ->(args: Hash(String, JSON::Any)) {
-            Command::Media::Delete.new(
-              args.map do |k, v| Argument.new(k, :optlong, v.to_s) end
-            ).run_impl
-          }
+          ->(args: Array(Argument)) {Command::Media::Delete.new(args).run_impl}
         ],
         [
           "media:update",
-          ->(args: Hash(String, JSON::Any)) {
-            Command::Media::Update.new(
-              args.map do |k, v| Argument.new(k, :optlong, v.to_s) end
-            ).run_impl
-          }
+          ->(args: Array(Argument)) {Command::Media::Update.new(args).run_impl}
         ],
         [
           "annotation:create",
-          ->(args: Hash(String, JSON::Any)) {
-            Command::Annotation::Create.new(
-              args.map do |k, v| Argument.new(k, :optlong, v.to_s) end
-            ).run_impl
-          }
+          ->(args: Array(Argument)) {Command::Annotation::Create.new(args).run_impl}
         ],
         [
           "annotation:delete",
-          ->(args: Hash(String, JSON::Any)) {
-            Command::Annotation::Delete.new(
-              args.map do |k, v| Argument.new(k, :optlong, v.to_s) end
-            ).run_impl
-          }
+          ->(args: Array(Argument)) {Command::Annotation::Delete.new(args).run_impl}
         ],
         [
           "annotation:update",
-          ->(args: Hash(String, JSON::Any)) {
-            Command::Annotation::Update.new(
-              args.map do |k, v| Argument.new(k, :optlong, v.to_s) end
-            ).run_impl
-          }
+          ->(args: Array(Argument)) {Command::Annotation::Update.new(args).run_impl}
         ],
       ]
 
@@ -136,7 +89,11 @@ module Command
           else
             command[1]
             .as(Proc(Hash(String, JSON::Any), Nil)) #...
-            .call(appendInstruction.args)
+            .call(
+              appendInstruction.args.map do |k, v| # mapping from_json ?
+                Argument.new(k, :optlong, v.to_s)
+              end
+            )
           end
           i+=1
         end

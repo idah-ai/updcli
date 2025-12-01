@@ -33,10 +33,10 @@ module Command
         #   "dataset:update",
         #   ->(args: Array(Argument)) {Command::Dataset::Update.new(args, self.root).run_impl}
         # ],
-        # [
-        #   "entry:create",
-        #   ->(args: Array(Argument)) {Command::Entry::Create.new(args, self.root).run_impl}
-        # ],
+        [
+          "entry:create",
+          ->(args: Array(Argument)) {Command::Entry::Create.new(args, self.root).run_impl}
+        ],
         [
           "entry:delete",
           ->(args: Array(Argument)) {Command::Entry::Delete.new(args, self.root).run_impl}
@@ -57,10 +57,10 @@ module Command
         #   "media:update",
         #   ->(args: Array(Argument)) {Command::Media::Update.new(args, self.root).run_impl}
         # ],
-        # [
-        #   "annotation:create",
-        #   ->(args: Array(Argument)) {Command::Annotation::Create.new(args, self.root).run_impl}
-        # ],
+        [
+          "annotation:create",
+          ->(args: Array(Argument)) {Command::Annotation::Create.new(args, self.root).run_impl}
+        ],
         [
           "annotation:delete",
           ->(args: Array(Argument)) {Command::Annotation::Delete.new(args, self.root).run_impl}

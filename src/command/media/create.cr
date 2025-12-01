@@ -8,7 +8,7 @@ module Command
       option "id", "i", "id", required: false, type: :string
       option "key", "k", "key", required: false, type: :string
       option "file", "f", "file path", required: true, type: :string
-      option "email", "e", "email", required: false, type: :string
+      option "email", "@", "email", required: false, type: :string
 
       def run_impl
         root.with_db do |db|

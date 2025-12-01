@@ -1,23 +1,20 @@
-require "uuid"
-
 module Command
-  module Dataset
+  module Entry
     class Create < Base
-      description "create"
-
+      description "Create an entry"
       option "id", "i", "id", required: false, type: :string
-      option "name", "n", "name", required: true, type: :string
-      option "modality", "m", "modality", required: true, type: :string
+      option "dataset_id", "d", "dataset id", required: true, type: :string
+      option "url", "u", "media_url", required: true, type: :string
       option "email", "@", "email", required: false, type: :string
 
       def run_impl
         root.with_db do |db|
           puts db.exec(
-            "INSERT into datasets values (?, ?, ?, ?)", # ?,...
+            "INSERT into entries values (?, ?, ?, ?)", # ?,...
             args: [
               option("id") || UUID.v7.to_s,
-              option("name"),
-              option("modality"),
+              option("dataset_id"),
+              option("url"),
               {
                 "Created-At": Time.local.to_s("%Y-%m-%d %H:%M:%S%:z"),
                 "Updated-At": nil,

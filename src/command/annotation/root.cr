@@ -1,6 +1,7 @@
 require "./list"
 require "./show"
 require "./delete"
+require "./create"
 
 module Command
   module Annotation
@@ -9,6 +10,7 @@ module Command
       sub_command "list", List
       sub_command "show", Show
       sub_command "delete", Delete
+      sub_command "create", Create
 
       def run_impl
         print_help

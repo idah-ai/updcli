@@ -1,5 +1,8 @@
 CRYSTAL := crystal
-FLAGS := --release --no-debug
+FLAGS := --static \
+         --release \
+        --link-flags="-L/usr/lib -lduckdb -lstdc++ -lm -lpthread -lz"
+
 SRC_DIR := src
 BUILD_DIR := bin
 EXECUTABLE := $(BUILD_DIR)/datset

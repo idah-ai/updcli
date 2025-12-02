@@ -1,21 +1,92 @@
-# Stage 1: Build the binary
+# Stage 1: Build DuckDB static library with musl
+FROM alpine:3.19 AS duckdb-builder
+WORKDIR /build
+
+RUN apk add --no-cache \
+    g++ \
+    git \
+    make \
+    cmake \
+    ninja \
+    python3 \
+    linux-headers \
+    zlib-dev \
+    zlib-static
+
+RUN git clone https://github.com/duckdb/duckdb && cd duckdb
+
+WORKDIR /build/duckdb
+
+RUN cmake -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DBUILD_UNITTESTS=OFF \
+    -DENABLE_SANITIZER=OFF \
+    -DDISABLE_EXTENSION_LOAD=1 \
+    -DCORE_EXTENSIONS='icu;json;parquet' \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DCMAKE_CXX_FLAGS="-fPIC" \
+    -DCMAKE_C_FLAGS="-fPIC" \
+    -B build/release \
+    -S .
+
+RUN cmake --build build/release --config Release
+
+
+# Create a merged static library containing everything
+WORKDIR /build/merged
+RUN mkdir -p extract && cd extract && \
+    echo "=== Extracting all .a files ===" && \
+    find /build/duckdb/build/release -name "*.a" -type f -print0 | while IFS= read -r -d '' lib; do \
+        echo "Extracting: $lib"; \
+        ar x "$lib"; \
+    done && \
+    echo "=== Creating merged library ===" && \
+    ar rcs libduckdb_merged.a *.o && \
+    ranlib libduckdb_merged.a && \
+    echo "=== Merged library created ===" && \
+    ls -lh libduckdb_merged.a
+
+# Stage 2: Build Crystal binary
 FROM crystallang/crystal:1.16.2-alpine AS builder
 
-# Install SQLite development package
-RUN apk add --no-cache sqlite-dev sqlite-static
+RUN apk add --no-cache \
+    build-base \
+    zlib-static \
+    zlib-dev \
+    musl-dev \
+    linux-headers \
+    libstdc++-dev \
+    libgcc
 
-# Create build directory
+# Copy ONLY the merged library
+COPY --from=duckdb-builder /build/merged/extract/libduckdb_merged.a /usr/lib/libduckdb.a
+
+# Copy headers
+COPY --from=duckdb-builder /build/duckdb/src/include/duckdb.h /usr/include/
+COPY --from=duckdb-builder /build/duckdb/src/include/duckdb.hpp /usr/include/
+COPY --from=duckdb-builder /build/duckdb/src/include/duckdb /usr/include/duckdb/
+
 RUN mkdir -p /dsb/bin
 WORKDIR /dsb
 
-# Copy dependencies first to leverage Docker caching
 COPY shard.yml ./
 COPY shard.lock ./
 RUN crystal -v && shards install --production -v
 
-# Copy source code and build files
 COPY src ./src
 COPY sql ./sql
+COPY Makefile ./
 
-# Build the binary
-RUN crystal build src/main.cr --static --release --output bin/datset
+# Verify the merged library
+RUN echo "=== Merged library size ===" && ls -lh /usr/lib/libduckdb.a
+
+# Build
+RUN make
+
+RUN file bin/datset && (ldd bin/datset 2>&1 || true)
+
+FROM alpine:3.19
+RUN apk add --no-cache libgcc libstdc++
+COPY --from=builder /dsb/bin/datset /usr/local/bin/datset
+ENTRYPOINT ["/usr/local/bin/datset"]

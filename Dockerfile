@@ -82,7 +82,7 @@ COPY Makefile ./
 RUN echo "=== Merged library size ===" && ls -lh /usr/lib/libduckdb.a
 
 # Build
-RUN make
+RUN make STATIC=1
 
 RUN file bin/datset && (ldd bin/datset 2>&1 || true)
 

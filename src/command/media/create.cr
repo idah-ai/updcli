@@ -8,7 +8,7 @@ module Command
       option "id", "i", "id", required: false, type: :string
       option "key", "k", "key", required: false, type: :string
       option "file", "f", "file path", required: true, type: :string
-      option "email", "@", "email", required: false, type: :string
+      option "metadata", "h", "metadata", required: false, type: :string
 
       def run_impl
         puts root.database.exec(
@@ -25,10 +25,10 @@ module Command
             option("key") || "",
             File.read(option("file") || "").to_slice, # ...
             MIME.from_filename(option("file") || ""), #...
-            {
+            option("metadata") || {
               "Created-At": Time.local.to_s("%Y-%m-%d %H:%M:%S%:z"),
               "Updated-At": nil,
-              "Created-by": option("email") || "updcli"
+              "Created-by": "updcli"
             }.to_json
           ]
         )

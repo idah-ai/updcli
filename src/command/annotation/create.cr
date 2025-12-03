@@ -7,7 +7,7 @@ module Command
       option "type", "t", "shape_type", required: true, type: :string
       option "annotation", "a", "annotation value", required: true, type: :string
       option "shape", "s", "shape_args", required: true, type: :string
-      option "email", "@", "email", required: false, type: :string
+      option "metadata", "h", "metadata", required: false, type: :string
 
       def run_impl
         puts root.database.exec(
@@ -18,10 +18,10 @@ module Command
             option("type"),
             JSON.parse(option("annotation") || "").to_json,
             JSON.parse(option("shape") || "").to_json,
-            {
+            option("metadata") || {
               "Created-At": Time.local.to_s("%Y-%m-%d %H:%M:%S%:z"),
               "Updated-At": nil,
-              "Created-by": option("email") || "updcli"
+              "Created-by": "updcli"
             }.to_json
           ]
         )

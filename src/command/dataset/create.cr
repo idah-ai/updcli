@@ -8,7 +8,7 @@ module Command
       option "id", "i", "id", required: false, type: :string
       option "name", "n", "name", required: true, type: :string
       option "modality", "m", "modality", required: true, type: :string
-      option "email", "@", "email", required: false, type: :string
+      option "metadata", "h", "metadata", required: false, type: :string
 
       def run_impl
         puts root.database.exec(
@@ -17,10 +17,10 @@ module Command
             option("id") || UUID.v7.to_s,
             option("name"),
             option("modality"),
-            {
+            option("metadata") || {
               "Created-At": Time.local.to_s("%Y-%m-%d %H:%M:%S%:z"),
               "Updated-At": nil,
-              "Created-by": option("email") || "updcli"
+              "Created-by": "updcli"
             }.to_json
           ]
         )

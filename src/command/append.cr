@@ -43,6 +43,10 @@ module Command
         #   ->(args: Array(Argument)) {Command::Dataset::Update.new(args, root, "dataset update").run}
         # },
         {
+          "entry:list",
+          ->(args: Array(Argument)) {Command::Entry::List.new(args, root, "entry list").run}
+        },
+        {
           "entry:create",
           ->(args: Array(Argument)) {Command::Entry::Create.new(args, root, "entry create").run}
         },
@@ -55,6 +59,10 @@ module Command
         #   ->(args: Array(Argument)) {Command::Entry::Update.new(args, root, "entry update").run}
         # },
         {
+          "media:list",
+          ->(args: Array(Argument)) {Command::Media::List.new(args, root, "media list").run}
+        },
+        {
           "media:create",
           ->(args: Array(Argument)) {Command::Media::Create.new(args, root, "media create").run}
         },
@@ -66,6 +74,10 @@ module Command
         #   "media:update",
         #   ->(args: Array(Argument)) {Command::Media::Update.new(args, root, "media update").run}
         # },
+        {
+          "annotation:list",
+          ->(args: Array(Argument)) {Command::Annotation::List.new(args, root, "annotation list").run}
+        },
         {
           "annotation:create",
           ->(args: Array(Argument)) {Command::Annotation::Create.new(args, root, "annotation create").run}
@@ -100,7 +112,7 @@ module Command
               command[1]
               .call(
                 appendInstruction.args.map do |k, v| # mapping from_json ?
-                  Argument.new(k, :optlong, v.to_s)
+                  Argument.new(k, :optlong, v.to_json.to_s)
                 end
               )
             end

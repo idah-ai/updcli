@@ -11,7 +11,7 @@ module Command
 
         next if stmt.empty?
 
-        root(Command::Root).database.exec stmt
+        root.database.exec stmt
       rescue e
         raise Command::Error.new("Failed to execute statement: #{stmt}\nError: #{e.message}", self)
       end

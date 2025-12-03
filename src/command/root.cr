@@ -11,6 +11,7 @@ module Command
     sub_command "media", Media::Root
     sub_command "entry", Entry::Root
     sub_command "annotation", Annotation::Root
+    sub_command "metadata", Metadata::Root
 
     property! database : DB::Connection
 

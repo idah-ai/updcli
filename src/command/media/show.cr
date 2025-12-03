@@ -5,22 +5,20 @@ module Command
       option "id", "i", "id", required: true, type: :string
 
       def run_impl
-        root.with_db do |db|
-          medias = db.query_all(
-            "SELECT id, media_type FROM medias WHERE id = ?",
-            option("id")
-          ) do |media|
-            {
-              id: media.read(String),
-              media_type: media.read(String)
-            }.to_h
-          end
-          if medias.empty?
-            puts "No Medias found."
-          else
-            medias.each do |media|
-              puts media.to_json
-            end
+        medias = root.database.query_all(
+          "SELECT id, media_type FROM medias WHERE id = ?",
+          option("id")
+        ) do |media|
+          {
+            id: media.read(String),
+            media_type: media.read(String)
+          }.to_h
+        end
+        if medias.empty?
+          puts "No Medias found."
+        else
+          medias.each do |media|
+            puts media.to_json
           end
         end
       end

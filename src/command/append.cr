@@ -1,4 +1,5 @@
 require "./base"
+require "./init"
 require "json"
 
 module Command
@@ -12,62 +13,70 @@ module Command
 
   class Append < Base
     description "append multiple records into the UPD file. Use jsonl format."
+    option "input", "i",
+      "Path to the input jsonl file. Default to /dev/stdin", required: false, type: :string
     option "force", "f",
       "Force append and overwrite existing records", required: false, type: :bool
-    option "input", "i",
-      "Path to the input jsonl file. Default to /dev/stdin", required: false
 
     def run_impl
       input = option("input") || "/dev/stdin"
 
       append_commands = [
         [
+          "init",
+          ->(args: Array(Argument)) {Command::Init.new(args, root).run}
+        ],
+        [
+          "dataset:list",
+          ->(args: Array(Argument)) {Command::Dataset::List.new(args, root).run}
+        ],
+        [
           "dataset:create",
-          ->(args: Array(Argument)) {Command::Dataset::Create.new(args, self.root).run_impl}
+          ->(args: Array(Argument)) {Command::Dataset::Create.new(args, root).run}
         ],
         [
           "dataset:delete",
-          ->(args: Array(Argument)) {Command::Dataset::Delete.new(args, self.root).run_impl}
+          ->(args: Array(Argument)) {Command::Dataset::Delete.new(args, root).run}
         ],
         # [
         #   "dataset:update",
-        #   ->(args: Array(Argument)) {Command::Dataset::Update.new(args, self.root).run_impl}
+        #   ->(args: Array(Argument)) {Command::Dataset::Update.new(args, root).run}
         # ],
         [
           "entry:create",
-          ->(args: Array(Argument)) {Command::Entry::Create.new(args, self.root).run_impl}
+          ->(args: Array(Argument)) {Command::Entry::Create.new(args, root).run}
         ],
         [
           "entry:delete",
-          ->(args: Array(Argument)) {Command::Entry::Delete.new(args, self.root).run_impl}
+          ->(args: Array(Argument)) {Command::Entry::Delete.new(args, root).run}
         ],
         # [
         #   "entry:update",
-        #   ->(args: Array(Argument)) {Command::Entry::Update.new(args, self.root).run_impl}
+        #   ->(args: Array(Argument)) {Command::Entry::Update.new(args, root).run}
         # ],
         [
           "media:create",
-          ->(args: Array(Argument)) {Command::Media::Create.new(args, self.root).run_impl}
+          ->(args: Array(Argument)) {Command::Media::Create.new(args, root).run}
         ],
         [
           "media:delete",
-          ->(args: Array(Argument)) {Command::Media::Delete.new(args, self.root).run_impl}
+          ->(args: Array(Argument)) {Command::Media::Delete.new(args, root).run}
         ],
         # [
         #   "media:update",
-        #   ->(args: Array(Argument)) {Command::Media::Update.new(args, self.root).run_impl}
+        #   ->(args: Array(Argument)) {Command::Media::Update.new(args, root).run}
         # ],
         [
           "annotation:create",
-          ->(args: Array(Argument)) {Command::Annotation::Create.new(args, self.root).run_impl}
+          ->(args: Array(Argument)) {Command::Annotation::Create.new(args, root).run}
         ],
         [
           "annotation:delete",
-          ->(args: Array(Argument)) {Command::Annotation::Delete.new(args, self.root).run_impl}
+          ->(args: Array(Argument)) {Command::Annotation::Delete.new(args, root).run}
         ],
         # [
         #   "annotation:update",
-        #   ->(args: Array(Argument)) {Command::Annotation::Update.new(args, self.root).run_impl}
+        #   ->(args: Array(Argument)) {Command::Annotation::Update.new(args, root).run}
         # ],
       ]
 

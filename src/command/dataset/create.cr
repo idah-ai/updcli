@@ -11,21 +11,19 @@ module Command
       option "email", "@", "email", required: false, type: :string
 
       def run_impl
-        root.with_db do |db|
-          puts db.exec(
-            "INSERT into datasets values (?, ?, ?, ?)", # ?,...
-            args: [
-              option("id") || UUID.v7.to_s,
-              option("name"),
-              option("modality"),
-              {
-                "Created-At": Time.local.to_s("%Y-%m-%d %H:%M:%S%:z"),
-                "Updated-At": nil,
-                "Created-by": option("email") || "updcli"
-              }.to_json
-            ]
-          )
-        end
+        puts root.database.exec(
+          "INSERT into datasets values (?, ?, ?, ?)", # ?,...
+          args: [
+            option("id") || UUID.v7.to_s,
+            option("name"),
+            option("modality"),
+            {
+              "Created-At": Time.local.to_s("%Y-%m-%d %H:%M:%S%:z"),
+              "Updated-At": nil,
+              "Created-by": option("email") || "updcli"
+            }.to_json
+          ]
+        )
       end
     end
   end

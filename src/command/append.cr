@@ -112,7 +112,7 @@ module Command
               command[1]
               .call(
                 appendInstruction.args.map do |k, v| # mapping from_json ?
-                  Argument.new(k, :optlong, v.to_json.to_s)
+                  Argument.new(k, :optlong, v.to_s)
                 end
               )
             end
@@ -122,6 +122,7 @@ module Command
         rescue e
           puts e
           root.database.exec("ROLLBACK")
+          raise e
         end
       end
     end

@@ -12,7 +12,7 @@ module Command
           {
             id: media.read(String),
             media_type: media.read(String)
-          }.to_h
+          }
         end
         if medias.empty?
           puts "No Medias found."

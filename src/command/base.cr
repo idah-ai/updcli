@@ -195,6 +195,18 @@ module Command
       end
     end
 
+    def self.get_command(cmd_array)
+      first, *rest = cmd_array
+      klass = self.self_sub_commands[first]
+      return unless klass
+
+      rest.empty? ? klass : klass.get_command(rest)
+    end
+
+    def self.for(args, root)
+      self.new(args, root, self.class.name) # todo aggregate command path ?
+    end
+
     # Executes the command.
     def run
       if sub_cmd = @sub_command_instance

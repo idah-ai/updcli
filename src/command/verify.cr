@@ -1,4 +1,5 @@
 require "digest/sha256"
+require "digest/sha512"
 require "base64"
 require "openssl_ext"
 require "json"
@@ -127,14 +128,14 @@ module Command
               puts "    Flavor tables: #{signed_flavor_tables.join(", ")}" if !signed_flavor_tables.empty?
             end
 
-            # Verify algorithm
-            unless algorithm == "SHA256"
-              raise "Unsupported hash algorithm: #{algorithm} (only SHA256 is currently supported)"
+            # Verify algorithm is supported
+            unless ["SHA256", "SHA512"].includes?(algorithm)
+              raise "Unsupported hash algorithm: #{algorithm} (supported: SHA256, SHA512)"
             end
 
-            # Verify curve
-            unless curve == "secp256r1"
-              raise "Unsupported ECDSA curve: #{curve} (only secp256r1 is currently supported)"
+            # Verify curve is supported
+            unless ["secp256r1"].includes?(curve)
+              raise "Unsupported ECDSA curve: #{curve} (supported: secp256r1)"
             end
 
             # Decode signature and certificate
@@ -154,32 +155,14 @@ module Command
               puts "    Certificate valid: #{certificate.not_before} to #{certificate.not_after}"
             end
 
+            # Regenerate data hash
             # Per RFC 5.4.1: Use the standardized core table order
             tables_to_serialize = UPD::Serialization::CORE_TABLES_ORDER + signed_flavor_tables
-
-            # Regenerate schema hash
-            computed_schema_hash = UPD::Serialization.compute_schema_hash(
-              root.database,
-              tables_to_serialize
-            )
-
-            if verbose
-              puts "    Expected schema hash: #{expected_schema_hash}"
-              puts "    Computed schema hash: #{computed_schema_hash}"
-            end
-
-            # Verify schema hash
-            unless computed_schema_hash == expected_schema_hash
-              raise "Schema hash mismatch!\n" +
-                    "    Expected: #{expected_schema_hash}\n" +
-                    "    Computed: #{computed_schema_hash}"
-            end
-
-            # Regenerate data hash
             computed_data_hash = UPD::Serialization.compute_data_hash(
               root.database,
               dataset_id,
-              tables_to_serialize
+              tables_to_serialize,
+              algorithm
             )
 
             if verbose
@@ -192,6 +175,25 @@ module Command
               raise "Data hash mismatch!\n" +
                     "    Expected: #{expected_data_hash}\n" +
                     "    Computed: #{computed_data_hash}"
+            end
+
+            # Regenerate schema hash
+            computed_schema_hash = UPD::Serialization.compute_schema_hash(
+              root.database,
+              tables_to_serialize,
+              algorithm
+            )
+
+            if verbose
+              puts "    Expected schema hash: #{expected_schema_hash}"
+              puts "    Computed schema hash: #{computed_schema_hash}"
+            end
+
+            # Verify schema hash
+            unless computed_schema_hash == expected_schema_hash
+              raise "Schema hash mismatch!\n" +
+                    "    Expected: #{expected_schema_hash}\n" +
+                    "    Computed: #{computed_schema_hash}"
             end
 
             # Verify ECDSA signature

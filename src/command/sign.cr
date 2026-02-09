@@ -1,4 +1,5 @@
 require "digest/sha256"
+require "digest/sha512"
 require "base64"
 require "openssl_ext"
 require "json"
@@ -37,10 +38,12 @@ module Command
     description "Sign datasets with ECDSA signatures"
 
     # Define CLI options
-    option "key", "k", "Path to EC private key", type: :string
-    option "cert", "c", "Path to X.509 certificate", type: :string
+    option "key", "k", "Path to EC private key", required: true, type: :string
+    option "cert", "c", "Path to X.509 certificate", required: true, type: :string
     option "dataset", "d", "Sign specific dataset ID (default: sign all)", type: :string
     option "flavor-tables", "f", "Comma-separated list of flavor tables to include", type: :string
+    option "algorithm", "a", "Hash algorithm: SHA256, SHA512", default: "SHA256", type: :string
+    option "curve", "u", "ECDSA curve: secp256r1", default: "secp256r1", type: :string
     option "verbose", "v", "Verbose output", type: :bool
 
     def run_impl
@@ -48,7 +51,25 @@ module Command
       cert_path = option("cert")
       dataset_id = option("dataset")
       flavor_tables_str = option("flavor-tables")
+      algorithm = (option("algorithm") || "SHA256").upcase
+      curve = option("curve") || "secp256r1"
       verbose = option("verbose") == "true"
+
+      # Validate algorithm
+      unless ["SHA256", "SHA512"].includes?(algorithm)
+        puts "Error: Unsupported hash algorithm: #{algorithm}"
+        puts "Supported algorithms: SHA256, SHA512"
+        puts "See RFC Section 9 Appendix A for recommendations"
+        return
+      end
+
+      # Validate curve
+      unless ["secp256r1"].includes?(curve)
+        puts "Error: Unsupported ECDSA curve: #{curve}"
+        puts "Supported curves: secp256r1"
+        puts "See RFC Section 9 Appendix A for recommendations"
+        return
+      end
 
       # Parse flavor tables
       flavor_tables = if flavor_tables_str && !flavor_tables_str.empty?
@@ -79,6 +100,8 @@ module Command
       if verbose
         puts "Using private key: #{key_path}"
         puts "Using certificate: #{cert_path}"
+        puts "Hash algorithm: #{algorithm}"
+        puts "ECDSA curve: #{curve}"
         puts "Certificate subject: #{certificate.subject}"
         puts "Certificate valid from #{certificate.not_before} to #{certificate.not_after}"
       end
@@ -127,7 +150,7 @@ module Command
         puts "Tables included in signature: #{all_tables.join(", ")}"
       end
 
-      schemaHash = UPD::Serialization.compute_schema_hash(root.database, all_tables)
+      schemaHash = UPD::Serialization.compute_schema_hash(root.database, all_tables, algorithm)
 
       if verbose
         puts "Schema hash: #{schemaHash}"
@@ -145,7 +168,7 @@ module Command
         puts "Processing: #{dataset_name} (#{dataset_id})"
 
         # Compute data hash
-        dataHash = UPD::Serialization.compute_data_hash(root.database, dataset_id, all_tables)
+        dataHash = UPD::Serialization.compute_data_hash(root.database, dataset_id, all_tables, algorithm)
         puts "  Data hash: #{dataHash}" if verbose
 
         # Sign the data hash
@@ -173,11 +196,11 @@ module Command
         # Create new signature object
         new_signature = Signature.new(
           Base64.strict_encode(signature),
-          "SHA256",
+          algorithm,
           dataHash,
           schemaHash,
           Base64.strict_encode(certificate.to_pem),
-          "secp256r1",
+          curve,
           Time.utc.to_rfc3339,
           flavor_tables
         )

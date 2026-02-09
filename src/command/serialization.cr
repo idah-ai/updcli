@@ -1,4 +1,5 @@
 require "digest/sha256"
+require "digest/sha512"
 require "duckdb"
 require "json"
 
@@ -63,19 +64,16 @@ module UPD
       sql.strip
     end
 
-    # Parse CREATE TABLE statement to extract column definitions
-    def self.parse_create_table(sql_statement : String)
-      normalized_stmt = normalize_sql(sql_statement)
-      if match = /CREATE TABLE (\w+)\(([^)]+)/.match(normalized_stmt)
+    # Get table columns from information_schema (robust, handles complex CREATE statements)
+    # Per RFC 5.4.3: Columns must be in ordinal_position order
+    def self.get_table_columns(database, table_name : String)
+      database.query_all(
+        "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '#{table_name}' ORDER BY ordinal_position ASC"
+      ) do |row|
         {
-          name: match[1],
-          columns: match[2].split(", ").map(&.strip).map do |column|
-            name, type, *rest = column.split(" ")
-            { name: name, type: type }
-          end.compact
+          name: row.read(String),
+          type: row.read(String).upcase
         }
-      else
-        raise "Failed to parse CREATE TABLE statement: #{sql_statement}"
       end
     end
 
@@ -97,8 +95,11 @@ module UPD
 
     # Serialize a single table for a dataset
     # Returns the canonical byte stream per RFC Section 5.4
-    def self.serialize_table(database, table_name : String, table_columns, dataset_id : String) : String
-      query_columns = normalized_query_columns(table_columns[:columns])
+    def self.serialize_table(database, table_name : String, dataset_id : String) : String
+      # Get columns from information_schema (guarantees correct ordinal order)
+      columns = get_table_columns(database, table_name)
+
+      query_columns = normalized_query_columns(columns)
       where_clause = get_where_clause(table_name, dataset_id)
 
       database.query_all(
@@ -108,7 +109,7 @@ module UPD
           ORDER BY id ASC
         EOF
       ) do |row|
-        table_columns[:columns].map do |column|
+        columns.map do |column|
           read_column(column, row)
         end.join("\x00COL\x00")
       end.join("\x00ROW\x00")
@@ -116,34 +117,31 @@ module UPD
 
     # Compute data hash for a dataset
     # Per RFC Section 5.4
-    def self.compute_data_hash(database, dataset_id : String, tables_to_serialize : Array(String)) : String
-      # Get table definitions
-      tables_columns = tables_to_serialize.map do |table_name|
-        sql_create_stmt = database.query_one(
-          "SELECT sql FROM duckdb_tables WHERE table_name = '#{table_name}'"
-        ) { |r| r.read(String) }
-
-        unless sql_create_stmt
-          raise "Missing CREATE TABLE statement for #{table_name}"
-        end
-
-        parse_create_table(sql_create_stmt)
-      end
-
-      # Serialize each table
-      tables_serialization = tables_columns.map do |table_columns|
-        serialize_table(database, table_columns[:name], table_columns, dataset_id)
+    # Supports multiple algorithms per RFC Section 9 Appendix A
+    def self.compute_data_hash(database, dataset_id : String, tables_to_serialize : Array(String), algorithm : String = "SHA256") : String
+      # Serialize each table (columns are fetched from information_schema inside serialize_table)
+      tables_serialization = tables_to_serialize.map do |table_name|
+        serialize_table(database, table_name, dataset_id)
       end.join("\x00TABLE\x00")
 
-      # Hash the serialized data
-      digest = Digest::SHA256.new
+      # Hash the serialized data using specified algorithm
+      digest = case algorithm
+      when "SHA256"
+        Digest::SHA256.new
+      when "SHA512"
+        Digest::SHA512.new
+      else
+        raise "Unsupported hash algorithm: #{algorithm}. Supported: SHA256, SHA512"
+      end
+
       digest.update(tables_serialization)
       digest.hexfinal
     end
 
     # Compute schema hash
     # Per RFC Section 5.5
-    def self.compute_schema_hash(database, tables : Array(String)) : String
+    # Supports multiple algorithms per RFC Section 9 Appendix A
+    def self.compute_schema_hash(database, tables : Array(String), algorithm : String = "SHA256") : String
       # Get CREATE TABLE statements for all tables
       sql_create_stmts = tables.map do |table_name|
         database.query_one(
@@ -155,8 +153,16 @@ module UPD
       normalized_stmts = sql_create_stmts.map { |stmt| normalize_sql(stmt) }.sort
       schema = normalized_stmts.join("\n")
 
-      # Hash the schema
-      digest = Digest::SHA256.new
+      # Hash the schema using specified algorithm
+      digest = case algorithm
+      when "SHA256"
+        Digest::SHA256.new
+      when "SHA512"
+        Digest::SHA512.new
+      else
+        raise "Unsupported hash algorithm: #{algorithm}. Supported: SHA256, SHA512"
+      end
+
       digest.update(schema)
       digest.hexfinal
     end

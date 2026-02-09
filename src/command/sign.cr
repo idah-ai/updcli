@@ -5,6 +5,7 @@ require "json"
 require "time"
 
 require "./dataset/update"
+require "./serialization"
 
 module Command
   record Signature,
@@ -33,101 +34,123 @@ module Command
     end
 
   class Sign < Base
-    description "Sign datasets"
+    description "Sign datasets with ECDSA signatures"
+
+    # Define CLI options
+    option "key", "k", "Path to EC private key", type: :string
+    option "cert", "c", "Path to X.509 certificate", type: :string
+    option "dataset", "d", "Sign specific dataset ID (default: sign all)", type: :string
+    option "flavor-tables", "f", "Comma-separated list of flavor tables to include", type: :string
+    option "verbose", "v", "Verbose output", type: :bool
 
     def run_impl
-      # Get CREATE TABLE statements for core tables
-      sql_create_stmt = root.database.query_all(
-        <<-EOF
-          SELECT sql FROM duckdb_tables
-          WHERE table_name IN ('annotations', 'entries')
-          ORDER BY table_name ASC
-        EOF
-      ) do |table|
-        table.read(String)
+      key_path = option("key")
+      cert_path = option("cert")
+      dataset_id = option("dataset")
+      flavor_tables_str = option("flavor-tables")
+      verbose = option("verbose") == "true"
+
+      # Parse flavor tables
+      flavor_tables = if flavor_tables_str && !flavor_tables_str.empty?
+        flavor_tables_str.split(",").map(&.strip)
+      else
+        [] of String
       end
 
-      if sql_create_stmt.empty?
-        puts "No tables found."
+      # Validate required files
+      unless key_path && File.exists?(key_path)
+        puts "Error: Private key file not found: #{key_path}"
+        puts "Generate one with: openssl ecparam -name prime256v1 -genkey -noout -out #{key_path}"
         return
       end
 
-      # Normalize and sort CREATE TABLE statements
-      normalized_stmt = sql_create_stmt.map { |stmt| normalize_sql(stmt) }
-      schema = normalized_stmt.sort.join("\n")
-      digest = Digest::SHA256.new
-      digest.update(schema)
-      schemaHash = digest.hexfinal
-
-      # Extract table columns for serialization
-      tables_columns = normalized_stmt.map do |stmt|
-        if match = /CREATE TABLE (\w+)\(([^)]+)/.match(stmt)
-          {
-            name: match[1],
-            columns: match[2].split(", ").map(&.strip).map do |column|
-              name, type, *rest = column.split(" ")
-              { name: name, type: type }
-            end.compact
-          }
-        else
-          puts "Failed to parse CREATE TABLE statement: #{stmt}"
-          nil
-        end
-      end.compact
-
-      datasets = root.database.query_all("SELECT id, metadata FROM datasets") do |dataset|
-        [dataset.read(String), dataset.read(String)]
+      unless cert_path && File.exists?(cert_path)
+        puts "Error: Certificate file not found: #{cert_path}"
+        puts "Generate one with: openssl req -new -x509 -key #{key_path} -out #{cert_path} -days 365"
+        return
       end
 
-      datasets.each do |(dataset_id, metadata)|
-        tables_to_serialize = ["entries", "annotations"]
-        tables_serialization = tables_to_serialize.map do |table|
-          table_columns = tables_columns.find { |tc| tc[:name] == table }
-          unless table_columns
-            raise "Missing table #{table}"
-          end
+      # Read key and certificate
+      key_pem = File.read(key_path)
+      cert_pem = File.read(cert_path)
+      ec_key = OpenSSL::PKey::EC.new(key_pem)
+      certificate = OpenSSL::X509::Certificate.new(cert_pem)
 
-          query_columns = normalized_query_columns(table_columns[:columns])
+      if verbose
+        puts "Using private key: #{key_path}"
+        puts "Using certificate: #{cert_path}"
+        puts "Certificate subject: #{certificate.subject}"
+        puts "Certificate valid from #{certificate.not_before} to #{certificate.not_after}"
+      end
 
-          # Use correct WHERE clause based on table
-          where_clause = case table
-          when "entries"
-            "WHERE dataset_id = '#{dataset_id}'"
-          when "annotations"
-            # Per RFC 5.4.1: annotations filtered by entry_id IN (SELECT id FROM entries WHERE dataset_id = ...)
-            "WHERE entry_id IN (SELECT id FROM entries WHERE dataset_id = '#{dataset_id}')"
-          else
-            raise "Unknown table: #{table}"
-          end
+      # Determine which datasets to sign
+      datasets = if dataset_id && !dataset_id.empty?
+        # Sign specific dataset
+        result = root.database.query_all(
+          "SELECT id, name, metadata FROM datasets WHERE id = ?",
+          dataset_id
+        ) do |dataset|
+          {
+            id: dataset.read(String),
+            name: dataset.read(String),
+            metadata: dataset.read(String)
+          }
+        end
 
-          root.database.query_all(
-            <<-EOF
-              SELECT #{query_columns.join(", ")} FROM #{table}
-              #{where_clause}
-              ORDER BY id ASC
-            EOF
-          ) do |row|
-            table_columns[:columns].map do |column|
-              read_column(column, row)
-            end.join("\x00COL\x00")
-          end.join("\x00ROW\x00")
-        end.join("\x00TABLE\x00")
+        if result.empty?
+          puts "Error: Dataset not found: #{dataset_id}"
+          return
+        end
 
-        # Hash the data
-        digest = Digest::SHA256.new
-        digest.update(tables_serialization)
-        dataHash = digest.hexfinal
+        result
+      else
+        # Sign all datasets
+        root.database.query_all("SELECT id, name, metadata FROM datasets") do |dataset|
+          {
+            id: dataset.read(String),
+            name: dataset.read(String),
+            metadata: dataset.read(String)
+          }
+        end
+      end
 
-        # Read key and certificate
-        key_pem = File.read("ec_private.key")
-        cert_pem = File.read("ec_certificate.pem")
+      if datasets.empty?
+        puts "No datasets found to sign"
+        return
+      end
 
-        # Create objects
-        ec_key = OpenSSL::PKey::EC.new(key_pem)
-        certificate = OpenSSL::X509::Certificate.new(cert_pem)
+      # Compute schema hash once (same for all datasets unless they have different flavor tables)
+      # Per RFC 5.4.1: Use the standardized core table order
+      all_tables = UPD::Serialization::CORE_TABLES_ORDER + flavor_tables
 
-        # Sign the raw data hash bytes
+      if verbose
+        puts "Tables included in signature: #{all_tables.join(", ")}"
+      end
+
+      schemaHash = UPD::Serialization.compute_schema_hash(root.database, all_tables)
+
+      if verbose
+        puts "Schema hash: #{schemaHash}"
+        puts ""
+      end
+
+      puts "Signing #{datasets.size} dataset(s)..."
+      puts ""
+
+      datasets.each do |dataset|
+        dataset_id = dataset[:id]
+        dataset_name = dataset[:name]
+        metadata = dataset[:metadata]
+
+        puts "Processing: #{dataset_name} (#{dataset_id})"
+
+        # Compute data hash
+        dataHash = UPD::Serialization.compute_data_hash(root.database, dataset_id, all_tables)
+        puts "  Data hash: #{dataHash}" if verbose
+
+        # Sign the data hash
         signature = ec_key.ec_sign(dataHash.hexbytes)
+        puts "  Signature: #{signature.size} bytes" if verbose
 
         # Parse existing metadata
         metadata_json = begin
@@ -136,7 +159,7 @@ module Command
           {} of String => JSON::Any
         end
 
-        # Get existing signatures as Array(JSON::Any)
+        # Get existing signatures
         content_signatures = begin
           if existing = metadata_json["Content-Signature"]?
             existing.as_a
@@ -156,71 +179,24 @@ module Command
           Base64.strict_encode(certificate.to_pem),
           "secp256r1",
           Time.utc.to_rfc3339,
-          [] of String
+          flavor_tables
         )
 
-        # Append new signature as JSON::Any
+        # Append new signature
         content_signatures << JSON.parse(new_signature.to_json)
-
-        # Update metadata
         metadata_json["Content-Signature"] = JSON::Any.new(content_signatures)
 
-        puts Dataset::Update.for([
+        # Update dataset metadata
+        result = Dataset::Update.for([
           Argument.new("id", :optlong, dataset_id),
           Argument.new("metadata", :optlong, metadata_json.to_json)
         ], root).run
-      end
-    end
 
-    private def normalized_query_columns(columns)
-      columns.map do |column|
-        case column[:type]
-        when "VARCHAR", "BLOB", "UUID"
-          column[:name]
-        when "BOOLEAN"
-          column[:name]
-        when "TINYINT", "SMALLINT", "INTEGER", "BIGINT", "HUGEINT",
-             "UTINYINT", "USMALLINT", "UINTEGER", "UBIGINT"
-          "CAST(#{column[:name]} AS VARCHAR)"
-        when "FLOAT", "DOUBLE", "DECIMAL"
-          "CAST(#{column[:name]} AS VARCHAR)"
-        when "TIMESTAMP", "TIMESTAMPTZ"
-          "strftime(#{column[:name]}, '%Y-%m-%dT%H:%M:%S.%fZ')"
-        when "DATE"
-          "strftime(#{column[:name]}, '%Y-%m-%d')"
-        when "TIME", "TIMETZ"
-          "strftime(#{column[:name]}, '%H:%M:%S.%f')"
-        else
-          raise "Unsupported attribute #{column[:name]} type #{column[:type]}"
-        end
-      end
-    end
-
-    private def read_column(column, row)
-      value = case column[:type]
-      when "VARCHAR", "BLOB", "UUID"
-        row.read(String?)
-      when "BOOLEAN"
-        bool_val = row.read(String?)
-        bool_val ? (bool_val =~ /^t|true$/i ? "true" : "false") : nil
-      when "TINYINT", "SMALLINT", "INTEGER", "BIGINT", "HUGEINT",
-           "UTINYINT", "USMALLINT", "UINTEGER", "UBIGINT",
-           "FLOAT", "DOUBLE", "DECIMAL",
-           "TIMESTAMP", "TIMESTAMPTZ", "DATE", "TIME", "TIMETZ"
-        # Already cast to VARCHAR in the query
-        row.read(String?)
-      else
-        raise "Unsupported attribute #{column[:name]} type #{column[:type]}"
+        puts "  ✓ Signed successfully (#{content_signatures.size} total signature(s))"
       end
 
-      value || "\x00NULL\x00"
-    end
-
-    private def normalize_sql(sql_statement : String) : String
-      sql = sql_statement.gsub(/--.*/, "")
-      sql = sql.gsub(/\/\*.*?\*\//m, "")
-      sql = sql.gsub(/\s+/, " ")
-      sql.strip
+      puts ""
+      puts "Signing complete!"
     end
   end
 end

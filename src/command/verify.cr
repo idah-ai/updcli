@@ -3,20 +3,80 @@ require "base64"
 require "openssl_ext"
 require "json"
 
+require "./serialization"
+
 module Command
   class Verify < Base
-    description "Verify dataset signatures"
+    description "Verify dataset ECDSA signatures"
+
+    # Define CLI options
+    option "dataset", "d", "Verify specific dataset ID (default: verify all)", type: :string
+    option "verbose", "v", "Verbose output", type: :bool
+    option "strict", "s", "Strict mode: also verify certificate validity dates", type: :bool
 
     def run_impl
-      datasets = root.database.query_all("SELECT id, metadata FROM datasets") do |dataset|
-        [dataset.read(String), dataset.read(String)]
+      dataset_id = option("dataset")
+      verbose = option("verbose") == "true"
+      strict = option("strict") == "true"
+
+      # Determine which datasets to verify
+      datasets = if dataset_id && !dataset_id.empty?
+        # Verify specific dataset
+        result = root.database.query_all(
+          "SELECT id, name, metadata FROM datasets WHERE id = ?",
+          dataset_id
+        ) do |dataset|
+          {
+            id: dataset.read(String),
+            name: dataset.read(String),
+            metadata: dataset.read(String)
+          }
+        end
+
+        if result.empty?
+          puts "Error: Dataset not found: #{dataset_id}"
+          exit 1
+        end
+
+        result
+      else
+        # Verify all datasets
+        root.database.query_all("SELECT id, name, metadata FROM datasets") do |dataset|
+          {
+            id: dataset.read(String),
+            name: dataset.read(String),
+            metadata: dataset.read(String)
+          }
+        end
       end
 
-      datasets.each do |(dataset_id, metadata)|
+      if datasets.empty?
+        puts "No datasets found to verify"
+        return
+      end
+
+      puts "Verifying #{datasets.size} dataset(s)..."
+      puts ""
+
+      total_datasets = 0
+      total_signatures = 0
+      failed_verifications = 0
+
+      datasets.each do |dataset|
+        total_datasets += 1
+        dataset_id = dataset[:id]
+        dataset_name = dataset[:name]
+        metadata = dataset[:metadata]
+
+        puts "Dataset: #{dataset_name} (#{dataset_id})"
+        puts "-" * 80 if verbose
+
         metadata_json = begin
           JSON.parse(metadata).as_h
-        rescue
-          puts "Invalid JSON metadata for dataset #{dataset_id}"
+        rescue e
+          puts "  ✗ Invalid JSON metadata: #{e.message}"
+          failed_verifications += 1
+          puts "" unless verbose
           next
         end
 
@@ -31,23 +91,26 @@ module Command
         end
 
         if content_signatures.empty?
-          puts "No signatures found for dataset #{dataset_id}"
+          puts "  - No signatures found"
+          puts "" unless verbose
           next
         end
 
-        content_signatures.each do |sig|
-          begin
-            # Decode signature and certificate
-            signature = Base64.decode(sig["signature"].as_s)
-            certificate = OpenSSL::X509::Certificate.new(String.new(Base64.decode(sig["certificate"].as_s)))
-            # certificate = OpenSSL::X509::Certificate.new(Base64.decode(sig["certificate"].as_s).to_s)
-            public_key = certificate.public_key
+        puts "  Found #{content_signatures.size} signature(s)" if verbose
 
-            # Ensure the key is EC
-            unless public_key.is_a?(OpenSSL::PKey::EC)
-              raise "Public key is not an EC key for dataset #{dataset_id}"
-            end
-            ec_key = public_key.as(OpenSSL::PKey::EC)
+        content_signatures.each_with_index do |sig, idx|
+          total_signatures += 1
+          sig_num = content_signatures.size > 1 ? " ##{idx + 1}" : ""
+
+          begin
+            # Extract signature fields
+            signature_b64 = sig["signature"].as_s
+            certificate_b64 = sig["certificate"].as_s
+            expected_data_hash = sig["dataHash"].as_s
+            expected_schema_hash = sig["schemaHash"].as_s
+            algorithm = sig["dataHashAlgorithm"].as_s
+            curve = sig["curve"].as_s
+            signed_at = sig["signedAt"].as_s
 
             # Get signed flavor tables
             signed_flavor_tables = begin
@@ -56,146 +119,123 @@ module Command
               [] of String
             end
 
-            # Regenerate data hash
-            tables_to_serialize = ["entries", "annotations"] + signed_flavor_tables
-            tables_serialization = tables_to_serialize.map do |table|
-              sql_create_stmt = root.database.query_one(
-                "SELECT sql FROM duckdb_tables WHERE table_name = '#{table}'"
-              ) { |r| r.read(String) }
-              unless sql_create_stmt
-                raise "Missing CREATE TABLE statement for #{table}"
-              end
+            if verbose
+              puts "  Signature#{sig_num}:"
+              puts "    Signed at: #{signed_at}"
+              puts "    Algorithm: #{algorithm}"
+              puts "    Curve: #{curve}"
+              puts "    Flavor tables: #{signed_flavor_tables.join(", ")}" if !signed_flavor_tables.empty?
+            end
 
-              normalized_stmt = normalize_sql(sql_create_stmt)
-              if match = /CREATE TABLE (\w+)\(([^)]+)/.match(normalized_stmt)
-                columns = match[2].split(", ").map(&.strip).map do |column|
-                  name, type, *rest = column.split(" ")
-                  { name: name, type: type }
-                end.compact
+            # Verify algorithm
+            unless algorithm == "SHA256"
+              raise "Unsupported hash algorithm: #{algorithm} (only SHA256 is currently supported)"
+            end
 
-                query_columns = normalized_query_columns(columns)
+            # Verify curve
+            unless curve == "secp256r1"
+              raise "Unsupported ECDSA curve: #{curve} (only secp256r1 is currently supported)"
+            end
 
-                # Use correct WHERE clause based on table
-                where_clause = case table
-                when "entries"
-                  "WHERE dataset_id = '#{dataset_id}'"
-                when "annotations"
-                  # Per RFC 5.4.1: annotations filtered by entry_id IN (SELECT id FROM entries WHERE dataset_id = ...)
-                  "WHERE entry_id IN (SELECT id FROM entries WHERE dataset_id = '#{dataset_id}')"
-                else
-                  # For flavor tables, assume they have dataset_id column
-                  # This should be validated or documented in the flavor spec
-                  "WHERE dataset_id = '#{dataset_id}'"
-                end
+            # Decode signature and certificate
+            signature = Base64.decode(signature_b64)
+            certificate = OpenSSL::X509::Certificate.new(String.new(Base64.decode(certificate_b64)))
+            public_key = certificate.public_key
 
-                root.database.query_all(
-                  <<-EOF
-                    SELECT #{query_columns.join(", ")} FROM #{table}
-                    #{where_clause}
-                    ORDER BY id ASC
-                  EOF
-                ) do |row|
-                  columns.map do |column|
-                    read_column(column, row)
-                  end.join("\x00COL\x00")
-                end.join("\x00ROW\x00")
-              else
-                raise "Failed to parse CREATE TABLE statement for #{table}"
-              end
-            end.join("\x00TABLE\x00")
+            # Ensure the key is EC
+            unless public_key.is_a?(OpenSSL::PKey::EC)
+              raise "Public key is not an EC key"
+            end
+            ec_key = public_key.as(OpenSSL::PKey::EC)
 
-            digest = Digest::SHA256.new
-            digest.update(tables_serialization)
-            dataHash = digest.hexfinal
+            if verbose
+              puts "    Certificate subject: #{certificate.subject}"
+              puts "    Certificate issuer: #{certificate.issuer}"
+              puts "    Certificate valid: #{certificate.not_before} to #{certificate.not_after}"
+            end
+
+            # Per RFC 5.4.1: Use the standardized core table order
+            tables_to_serialize = UPD::Serialization::CORE_TABLES_ORDER + signed_flavor_tables
 
             # Regenerate schema hash
-            sql_create_stmts = tables_to_serialize.map do |table|
-              root.database.query_one(
-                "SELECT sql FROM duckdb_tables WHERE table_name = '#{table}'"
-              ) { |r| r.read(String) }
-            end.compact
-            normalized_stmts = sql_create_stmts.map { |stmt| normalize_sql(stmt) }.sort
-            schema = normalized_stmts.join("\n")
-            schema_digest = Digest::SHA256.new
-            schema_digest.update(schema)
-            schemaHash = schema_digest.hexfinal
+            computed_schema_hash = UPD::Serialization.compute_schema_hash(
+              root.database,
+              tables_to_serialize
+            )
 
-            # Verify data hash
-            unless dataHash == sig["dataHash"].as_s
-              raise "Data hash mismatch for dataset #{dataset_id}. Expected: #{sig["dataHash"].as_s}, Got: #{dataHash}"
+            if verbose
+              puts "    Expected schema hash: #{expected_schema_hash}"
+              puts "    Computed schema hash: #{computed_schema_hash}"
             end
 
             # Verify schema hash
-            unless schemaHash == sig["schemaHash"].as_s
-              raise "Schema hash mismatch for dataset #{dataset_id}. Expected: #{sig["schemaHash"].as_s}, Got: #{schemaHash}"
+            unless computed_schema_hash == expected_schema_hash
+              raise "Schema hash mismatch!\n" +
+                    "    Expected: #{expected_schema_hash}\n" +
+                    "    Computed: #{computed_schema_hash}"
             end
 
-            # Verify signature
-            unless ec_key.ec_verify(dataHash.hexbytes, signature)
-              raise "Signature verification failed for dataset #{dataset_id}"
+            # Regenerate data hash
+            computed_data_hash = UPD::Serialization.compute_data_hash(
+              root.database,
+              dataset_id,
+              tables_to_serialize
+            )
+
+            if verbose
+              puts "    Expected data hash: #{expected_data_hash}"
+              puts "    Computed data hash: #{computed_data_hash}"
             end
 
-            puts "✓ Signature for dataset #{dataset_id} is valid."
-            puts "  - Data hash: #{dataHash}"
-            puts "  - Signed at: #{sig["signedAt"].as_s}"
-            puts "  - Algorithm: #{sig["dataHashAlgorithm"].as_s}"
-            puts "  - Curve: #{sig["curve"].as_s}"
+            # Verify data hash
+            unless computed_data_hash == expected_data_hash
+              raise "Data hash mismatch!\n" +
+                    "    Expected: #{expected_data_hash}\n" +
+                    "    Computed: #{computed_data_hash}"
+            end
+
+            # Verify ECDSA signature
+            unless ec_key.ec_verify(computed_data_hash.hexbytes, signature)
+              raise "ECDSA signature verification failed"
+            end
+
+            # Optional: Verify certificate validity
+            if strict
+              now = Time.utc
+              if certificate.not_before > now
+                raise "Certificate not yet valid (not_before: #{certificate.not_before})"
+              end
+              if certificate.not_after < now
+                raise "Certificate expired (not_after: #{certificate.not_after})"
+              end
+            end
+
+            puts "  ✓ Signature#{sig_num} valid"
+
           rescue e
-            puts "✗ Verification failed for dataset #{dataset_id}: #{e.message}"
+            puts "  ✗ Signature#{sig_num} INVALID: #{e.message}"
+            failed_verifications += 1
           end
         end
-      end
-    end
 
-    private def normalized_query_columns(columns)
-      columns.map do |column|
-        case column[:type]
-        when "VARCHAR", "BLOB", "UUID"
-          column[:name]
-        when "BOOLEAN"
-          column[:name]
-        when "TINYINT", "SMALLINT", "INTEGER", "BIGINT", "HUGEINT",
-             "UTINYINT", "USMALLINT", "UINTEGER", "UBIGINT"
-          "CAST(#{column[:name]} AS VARCHAR)"
-        when "FLOAT", "DOUBLE", "DECIMAL"
-          "CAST(#{column[:name]} AS VARCHAR)"
-        when "TIMESTAMP", "TIMESTAMPTZ"
-          "strftime(#{column[:name]}, '%Y-%m-%dT%H:%M:%S.%fZ')"
-        when "DATE"
-          "strftime(#{column[:name]}, '%Y-%m-%d')"
-        when "TIME", "TIMETZ"
-          "strftime(#{column[:name]}, '%H:%M:%S.%f')"
-        else
-          raise "Unsupported attribute #{column[:name]} type #{column[:type]}"
-        end
+        puts "" unless verbose
       end
-    end
 
-    private def read_column(column, row)
-      value = case column[:type]
-      when "VARCHAR", "BLOB", "UUID"
-        row.read(String?)
-      when "BOOLEAN"
-        bool_val = row.read(String?)
-        bool_val ? (bool_val =~ /^t|true$/i ? "true" : "false") : nil
-      when "TINYINT", "SMALLINT", "INTEGER", "BIGINT", "HUGEINT",
-           "UTINYINT", "USMALLINT", "UINTEGER", "UBIGINT",
-           "FLOAT", "DOUBLE", "DECIMAL",
-           "TIMESTAMP", "TIMESTAMPTZ", "DATE", "TIME", "TIMETZ"
-        # Already cast to VARCHAR in the query
-        row.read(String?)
+      # Summary
+      puts "=" * 80
+      puts "Verification Summary:"
+      puts "  Datasets verified: #{total_datasets}"
+      puts "  Total signatures: #{total_signatures}"
+      puts "  Failed verifications: #{failed_verifications}"
+
+      if failed_verifications > 0
+        puts ""
+        puts "⚠️  Some signatures failed verification!"
+        exit 1
       else
-        raise "Unsupported attribute #{column[:name]} type #{column[:type]}"
+        puts ""
+        puts "✓ All signatures valid"
       end
-
-      value || "\x00NULL\x00"
-    end
-
-    private def normalize_sql(sql_statement : String) : String
-      sql = sql_statement.gsub(/--.*/, "")
-      sql = sql.gsub(/\/\*.*?\*\//m, "")
-      sql = sql.gsub(/\s+/, " ")
-      sql.strip
     end
   end
 end

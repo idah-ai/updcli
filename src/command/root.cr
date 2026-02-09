@@ -12,6 +12,8 @@ module Command
     sub_command "entry", Entry::Root
     sub_command "annotation", Annotation::Root
     sub_command "metadata", Metadata::Root
+    sub_command "sign", Sign
+    sub_command "verify", Verify
 
     property! database : DB::Connection
 

@@ -11,6 +11,8 @@ dependencies:
   duckdb:
     github: amauryt/crystal-duckdb
     version: ~> 0.2.5
+  openssl_ext:
+    github: spider-gazelle/openssl_ext
 
 targets:
   updcli:

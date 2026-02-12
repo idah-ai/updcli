@@ -4,7 +4,9 @@ require "base64"
 require "openssl_ext"
 require "json"
 
-require "./serialization"
+require "./base"
+require "../upd/serialization"
+require "../upd/signature_validator"
 
 module Command
   class Verify < Base
@@ -15,13 +17,36 @@ module Command
     option "verbose", "v", "Verbose output", type: :bool
     option "strict", "s", "Strict mode: also verify certificate validity dates", type: :bool
 
+    # Summary statistics for verification run
+    record VerificationSummary,
+      total_datasets : Int32,
+      total_signatures : Int32,
+      failed_verifications : Int32
+
     def run_impl
+      puts("RUN VERIFY")
+
       dataset_id = option("dataset")
       verbose = option("verbose") == "true"
       strict = option("strict") == "true"
 
-      # Determine which datasets to verify
-      datasets = if dataset_id && !dataset_id.empty?
+      datasets = fetch_datasets(dataset_id)
+
+      if datasets.empty?
+        puts "No datasets found to verify"
+        return
+      end
+
+      puts "Verifying #{datasets.size} dataset(s)..."
+      puts ""
+
+      summary = verify_all_datasets(datasets, verbose, strict)
+      print_summary(summary)
+    end
+
+    # Fetch datasets from database
+    protected def fetch_datasets(dataset_id : String?)
+      if dataset_id && !dataset_id.empty?
         # Verify specific dataset
         result = root.database.query_all(
           "SELECT id, name, metadata FROM datasets WHERE id = ?",
@@ -50,15 +75,10 @@ module Command
           }
         end
       end
+    end
 
-      if datasets.empty?
-        puts "No datasets found to verify"
-        return
-      end
-
-      puts "Verifying #{datasets.size} dataset(s)..."
-      puts ""
-
+    # Verify all datasets
+    protected def verify_all_datasets(datasets, verbose : Bool, strict : Bool) : VerificationSummary
       total_datasets = 0
       total_signatures = 0
       failed_verifications = 0
@@ -72,165 +92,124 @@ module Command
         puts "Dataset: #{dataset_name} (#{dataset_id})"
         puts "-" * 80 if verbose
 
-        metadata_json = begin
-          JSON.parse(metadata).as_h
-        rescue e
-          puts "  ✗ Invalid JSON metadata: #{e.message}"
-          failed_verifications += 1
-          puts "" unless verbose
-          next
-        end
+        failures = verify_dataset(dataset_id, dataset_name, metadata, verbose, strict)
 
-        content_signatures = begin
-          if sig = metadata_json["Content-Signature"]?
-            sig.as_a
-          else
-            [] of JSON::Any
-          end
-        rescue
-          [] of JSON::Any
-        end
-
-        if content_signatures.empty?
-          puts "  - No signatures found"
-          puts "" unless verbose
-          next
-        end
-
-        puts "  Found #{content_signatures.size} signature(s)" if verbose
-
-        content_signatures.each_with_index do |sig, idx|
-          total_signatures += 1
-          sig_num = content_signatures.size > 1 ? " ##{idx + 1}" : ""
-
-          begin
-            # Extract signature fields
-            signature_b64 = sig["signature"].as_s
-            certificate_b64 = sig["certificate"].as_s
-            expected_data_hash = sig["dataHash"].as_s
-            expected_schema_hash = sig["schemaHash"].as_s
-            algorithm = sig["dataHashAlgorithm"].as_s
-            curve = sig["curve"].as_s
-            signed_at = sig["signedAt"].as_s
-
-            # Get signed flavor tables
-            signed_flavor_tables = begin
-              sig["signedFlavorTables"].as_a.map(&.as_s)
-            rescue
-              [] of String
-            end
-
-            if verbose
-              puts "  Signature#{sig_num}:"
-              puts "    Signed at: #{signed_at}"
-              puts "    Algorithm: #{algorithm}"
-              puts "    Curve: #{curve}"
-              puts "    Flavor tables: #{signed_flavor_tables.join(", ")}" if !signed_flavor_tables.empty?
-            end
-
-            # Verify algorithm is supported
-            unless ["SHA256", "SHA512"].includes?(algorithm)
-              raise "Unsupported hash algorithm: #{algorithm} (supported: SHA256, SHA512)"
-            end
-
-            # Verify curve is supported
-            unless ["secp256r1"].includes?(curve)
-              raise "Unsupported ECDSA curve: #{curve} (supported: secp256r1)"
-            end
-
-            # Decode signature and certificate
-            signature = Base64.decode(signature_b64)
-            certificate = OpenSSL::X509::Certificate.new(String.new(Base64.decode(certificate_b64)))
-            public_key = certificate.public_key
-
-            # Ensure the key is EC
-            unless public_key.is_a?(OpenSSL::PKey::EC)
-              raise "Public key is not an EC key"
-            end
-            ec_key = public_key.as(OpenSSL::PKey::EC)
-
-            if verbose
-              puts "    Certificate subject: #{certificate.subject}"
-              puts "    Certificate issuer: #{certificate.issuer}"
-              puts "    Certificate valid: #{certificate.not_before} to #{certificate.not_after}"
-            end
-
-            # Regenerate data hash
-            # Per RFC 5.4.1: Use the standardized core table order
-            tables_to_serialize = UPD::Serialization::CORE_TABLES_ORDER + signed_flavor_tables
-            computed_data_hash = UPD::Serialization.compute_data_hash(
-              root.database,
-              dataset_id,
-              tables_to_serialize,
-              algorithm
-            )
-
-            if verbose
-              puts "    Expected data hash: #{expected_data_hash}"
-              puts "    Computed data hash: #{computed_data_hash}"
-            end
-
-            # Verify data hash
-            unless computed_data_hash == expected_data_hash
-              raise "Data hash mismatch!\n" +
-                    "    Expected: #{expected_data_hash}\n" +
-                    "    Computed: #{computed_data_hash}"
-            end
-
-            # Regenerate schema hash
-            computed_schema_hash = UPD::Serialization.compute_schema_hash(
-              root.database,
-              tables_to_serialize,
-              algorithm
-            )
-
-            if verbose
-              puts "    Expected schema hash: #{expected_schema_hash}"
-              puts "    Computed schema hash: #{computed_schema_hash}"
-            end
-
-            # Verify schema hash
-            unless computed_schema_hash == expected_schema_hash
-              raise "Schema hash mismatch!\n" +
-                    "    Expected: #{expected_schema_hash}\n" +
-                    "    Computed: #{computed_schema_hash}"
-            end
-
-            # Verify ECDSA signature
-            unless ec_key.ec_verify(computed_data_hash.hexbytes, signature)
-              raise "ECDSA signature verification failed"
-            end
-
-            # Optional: Verify certificate validity
-            if strict
-              now = Time.utc
-              if certificate.not_before > now
-                raise "Certificate not yet valid (not_before: #{certificate.not_before})"
-              end
-              if certificate.not_after < now
-                raise "Certificate expired (not_after: #{certificate.not_after})"
-              end
-            end
-
-            puts "  ✓ Signature#{sig_num} valid"
-
-          rescue e
-            puts "  ✗ Signature#{sig_num} INVALID: #{e.message}"
-            failed_verifications += 1
-          end
-        end
+        total_signatures += failures[:signature_count]
+        failed_verifications += failures[:failures]
 
         puts "" unless verbose
       end
 
-      # Summary
+      VerificationSummary.new(
+        total_datasets: total_datasets,
+        total_signatures: total_signatures,
+        failed_verifications: failed_verifications
+      )
+    end
+
+    # Verify a single dataset
+    protected def verify_dataset(
+      dataset_id : String,
+      dataset_name : String,
+      metadata : String,
+      verbose : Bool,
+      strict : Bool
+    )
+      result = {signature_count: 0, failures: 0}.to_h
+
+      # Parse metadata
+      metadata_json = UPD::SignatureValidator.parse_metadata(metadata)
+      unless metadata_json
+        puts "  ✗ Invalid JSON metadata"
+        result[:failures] += 1
+        return result
+      end
+
+      # Extract signatures
+      content_signatures = UPD::SignatureValidator.extract_signatures(metadata_json)
+
+      if content_signatures.empty?
+        puts "  - No signatures found"
+        return result
+      end
+
+      puts "  Found #{content_signatures.size} signature(s)" if verbose
+
+      # Verify each signature
+      content_signatures.each_with_index do |sig, idx|
+        result[:signature_count] += 1
+        sig_num = content_signatures.size > 1 ? " ##{idx + 1}" : ""
+
+        success = verify_single_signature(
+          dataset_id,
+          sig,
+          sig_num,
+          verbose,
+          strict
+        )
+
+        result[:failures] += 1 unless success
+      end
+
+      result
+    end
+
+    # Verify a single signature
+    protected def verify_single_signature(
+      dataset_id : String,
+      sig : JSON::Any,
+      sig_num : String,
+      verbose : Bool,
+      strict : Bool
+    ) : Bool
+      begin
+        # Extract signature data using validator
+        sig_data = UPD::SignatureValidator.extract_signature_data(sig)
+
+        if verbose
+          print_signature_info(sig_data, sig_num)
+        end
+
+        # Use the validator to verify the signature
+        verification_result = UPD::SignatureValidator.verify_signature(
+          root.database,
+          dataset_id,
+          sig_data,
+          strict
+        )
+
+        if verification_result.success
+          puts "  ✓ Signature#{sig_num} valid"
+          true
+        else
+          puts "  ✗ Signature#{sig_num} INVALID: #{verification_result.message}"
+          false
+        end
+
+      rescue e
+        puts "  ✗ Signature#{sig_num} INVALID: #{e.message}"
+        false
+      end
+    end
+
+    # Print signature information (verbose mode)
+    protected def print_signature_info(sig_data : UPD::SignatureValidator::SignatureData, sig_num : String)
+      puts "  Signature#{sig_num}:"
+      puts "    Signed at: #{sig_data.signed_at}"
+      puts "    Algorithm: #{sig_data.algorithm}"
+      puts "    Curve: #{sig_data.curve}"
+      puts "    Flavor tables: #{sig_data.signed_flavor_tables.join(", ")}" if !sig_data.signed_flavor_tables.empty?
+    end
+
+    # Print verification summary
+    protected def print_summary(summary : VerificationSummary)
       puts "=" * 80
       puts "Verification Summary:"
-      puts "  Datasets verified: #{total_datasets}"
-      puts "  Total signatures: #{total_signatures}"
-      puts "  Failed verifications: #{failed_verifications}"
+      puts "  Datasets verified: #{summary.total_datasets}"
+      puts "  Total signatures: #{summary.total_signatures}"
+      puts "  Failed verifications: #{summary.failed_verifications}"
 
-      if failed_verifications > 0
+      if summary.failed_verifications > 0
         puts ""
         puts "⚠️  Some signatures failed verification!"
         exit 1

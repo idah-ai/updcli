@@ -1,3 +1,13 @@
+require "./init"
+require "./append"
+require "./dataset/root"
+require "./entry/root"
+require "./annotation/root"
+require "./media/root"
+require "./metadata/root"
+require "./sign"
+require "./verify"
+
 module Command
   class Root < Base
     description "updcli: A command-line tool for managing Universal Portable Datasets (UPD)."

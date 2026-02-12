@@ -6,7 +6,7 @@ require "json"
 require "time"
 
 require "./dataset/update"
-require "./serialization"
+require "../upd/serialization"
 
 module Command
   record Signature,

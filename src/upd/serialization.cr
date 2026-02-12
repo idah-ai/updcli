@@ -120,10 +120,6 @@ module UPD
     # Supports multiple algorithms per RFC Section 9 Appendix A
     def self.compute_data_hash(database, dataset_id : String, tables_to_serialize : Array(String), algorithm : String = "SHA256") : String
       # Serialize each table (columns are fetched from information_schema inside serialize_table)
-      tables_serialization = tables_to_serialize.map do |table_name|
-        serialize_table(database, table_name, dataset_id)
-      end.join("\x00TABLE\x00")
-
       # Hash the serialized data using specified algorithm
       digest = case algorithm
       when "SHA256"
@@ -133,6 +129,10 @@ module UPD
       else
         raise "Unsupported hash algorithm: #{algorithm}. Supported: SHA256, SHA512"
       end
+
+      tables_serialization = tables_to_serialize.map do |table_name|
+        serialize_table(database, table_name, dataset_id)
+      end.join("\x00TABLE\x00")
 
       digest.update(tables_serialization)
       digest.hexfinal

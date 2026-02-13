@@ -24,8 +24,6 @@ module Command
       failed_verifications : Int32
 
     def run_impl
-      puts("RUN VERIFY")
-
       dataset_id = option("dataset")
       verbose = option("verbose") == "true"
       strict = option("strict") == "true"
@@ -60,8 +58,7 @@ module Command
         end
 
         if result.empty?
-          puts "Error: Dataset not found: #{dataset_id}"
-          exit 1
+          raise Command::UpdError.new("Dataset not found: #{dataset_id}", self)
         end
 
         result
@@ -211,8 +208,7 @@ module Command
 
       if summary.failed_verifications > 0
         puts ""
-        puts "⚠️  Some signatures failed verification!"
-        exit 1
+        raise Command::UpdError.new("⚠️  Some signatures failed verification!", self)
       else
         puts ""
         puts "✓ All signatures valid"

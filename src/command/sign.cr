@@ -57,18 +57,22 @@ module Command
 
       # Validate algorithm
       unless ["SHA256", "SHA512"].includes?(algorithm)
-        puts "Error: Unsupported hash algorithm: #{algorithm}"
-        puts "Supported algorithms: SHA256, SHA512"
-        puts "See RFC Section 9 Appendix A for recommendations"
-        return
+        raise Command::UpdError.new(
+          "Unsupported hash algorithm: #{algorithm}\n" +
+          "Supported algorithms: SHA256, SHA512\n" +
+          "See RFC Section 9 Appendix A for recommendations",
+          self
+        )
       end
 
       # Validate curve
       unless ["secp256r1"].includes?(curve)
-        puts "Error: Unsupported ECDSA curve: #{curve}"
-        puts "Supported curves: secp256r1"
-        puts "See RFC Section 9 Appendix A for recommendations"
-        return
+        raise Command::UpdError.new(
+          "Unsupported ECDSA curve: #{curve}\n" +
+          "Supported curves: secp256r1\n" +
+          "See RFC Section 9 Appendix A for recommendations",
+          self
+        )
       end
 
       # Parse flavor tables
@@ -80,15 +84,19 @@ module Command
 
       # Validate required files
       unless key_path && File.exists?(key_path)
-        puts "Error: Private key file not found: #{key_path}"
-        puts "Generate one with: openssl ecparam -name prime256v1 -genkey -noout -out #{key_path}"
-        return
+        raise Command::UpdError.new(
+          "Private key file not found: #{key_path}\n" +
+          "Generate one with: openssl ecparam -name prime256v1 -genkey -noout -out key.pem",
+          self
+        )
       end
 
       unless cert_path && File.exists?(cert_path)
-        puts "Error: Certificate file not found: #{cert_path}"
-        puts "Generate one with: openssl req -new -x509 -key #{key_path} -out #{cert_path} -days 365"
-        return
+        raise Command::UpdError.new(
+          "Certificate file not found: #{cert_path}\n" +
+          "Generate one with: openssl req -new -x509 -key #{key_path} -out cert.pem -days 365",
+          self
+        )
       end
 
       # Read key and certificate
@@ -121,8 +129,7 @@ module Command
         end
 
         if result.empty?
-          puts "Error: Dataset not found: #{dataset_id}"
-          return
+          raise Command::UpdError.new("Dataset not found: #{dataset_id}", self)
         end
 
         result

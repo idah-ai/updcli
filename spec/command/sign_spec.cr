@@ -177,8 +177,30 @@ describe Command::Sign do
     end
 
     it "rejects unsupported hash algorithms" do
-      # MD5, SHA1, etc. should be rejected as per RFC Section 9
-      # The implementation should print an error and return without signing
+      DB.connect("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO datasets VALUES ('ds-1', 'Test', 'image', '{}')")
+        db.close
+      end
+
+      key, cert = SignSpecHelpers.create_test_key_and_cert
+
+      File.tempfile("key") do |key_file|
+        File.tempfile("cert") do |cert_file|
+          File.write(key_file.path, key.to_pem)
+          File.write(cert_file.path, cert.to_pem)
+
+          expect_raises(Command::UpdError, /Unsupported hash algorithm: MD5/) do
+            Command::Root.new([
+              Command::Argument.new("input", :optlong, "test.upd"),
+              Command::Argument.new("sign", :pos, nil),
+              Command::Argument.new("key", :optlong, key_file.path),
+              Command::Argument.new("cert", :optlong, cert_file.path),
+              Command::Argument.new("algorithm", :optlong, "MD5"),
+              Command::Argument.new("dataset", :optlong, "ds-1")
+            ]).run
+          end
+        end
+      end
     end
   end
 
@@ -189,7 +211,30 @@ describe Command::Sign do
     end
 
     it "rejects unsupported curves" do
-      # Custom curves should be rejected as per RFC Section 9
+      DB.connect("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO datasets VALUES ('ds-1', 'Test', 'image', '{}')")
+        db.close
+      end
+
+      key, cert = SignSpecHelpers.create_test_key_and_cert
+
+      File.tempfile("key") do |key_file|
+        File.tempfile("cert") do |cert_file|
+          File.write(key_file.path, key.to_pem)
+          File.write(cert_file.path, cert.to_pem)
+
+          expect_raises(Command::UpdError, /Unsupported ECDSA curve: secp384r1/) do
+            Command::Root.new([
+              Command::Argument.new("input", :optlong, "test.upd"),
+              Command::Argument.new("sign", :pos, nil),
+              Command::Argument.new("key", :optlong, key_file.path),
+              Command::Argument.new("cert", :optlong, cert_file.path),
+              Command::Argument.new("curve", :optlong, "secp384r1"),
+              Command::Argument.new("dataset", :optlong, "ds-1")
+            ]).run
+          end
+        end
+      end
     end
   end
 
@@ -334,7 +379,6 @@ describe Command::Sign do
 
   describe "error handling" do
     it "reports error when dataset not found" do
-
       key, cert = SignSpecHelpers.create_test_key_and_cert
 
       File.tempfile("key") do |key_file|
@@ -342,27 +386,47 @@ describe Command::Sign do
           File.write(key_file.path, key.to_pem)
           File.write(cert_file.path, cert.to_pem)
 
-          # # Should print error message (capture output in real test)
-          # sign.run
-          root = Command::Root.new([
-            Command::Argument.new("input", :optlong, "test.upd"),
-            Command::Argument.new("sign", :pos, nil),
-            Command::Argument.new("key", :optlong, key_file.path),
-            Command::Argument.new("cert", :optlong, cert_file.path),
-            Command::Argument.new("dataset", :optlong, "nonexistent-id")
-          ])
-          root.run
-
+          expect_raises(Command::UpdError, /Dataset not found: nonexistent-id/) do
+            Command::Root.new([
+              Command::Argument.new("input", :optlong, "test.upd"),
+              Command::Argument.new("sign", :pos, nil),
+              Command::Argument.new("key", :optlong, key_file.path),
+              Command::Argument.new("cert", :optlong, cert_file.path),
+              Command::Argument.new("dataset", :optlong, "nonexistent-id")
+            ]).run
+          end
         end
       end
     end
 
     it "reports error when key file not found" do
-      # Test missing key file
+      expect_raises(Command::UpdError, /Private key file not found/) do
+        Command::Root.new([
+          Command::Argument.new("input", :optlong, "test.upd"),
+          Command::Argument.new("sign", :pos, nil),
+          Command::Argument.new("key", :optlong, "/nonexistent/key.pem"),
+          Command::Argument.new("cert", :optlong, "/nonexistent/cert.pem"),
+          Command::Argument.new("dataset", :optlong, "ds-1")
+        ]).run
+      end
     end
 
     it "reports error when certificate file not found" do
-      # Test missing cert file
+      key, _ = SignSpecHelpers.create_test_key_and_cert
+
+      File.tempfile("key") do |key_file|
+        File.write(key_file.path, key.to_pem)
+
+        expect_raises(Command::UpdError, /Certificate file not found/) do
+          Command::Root.new([
+            Command::Argument.new("input", :optlong, "test.upd"),
+            Command::Argument.new("sign", :pos, nil),
+            Command::Argument.new("key", :optlong, key_file.path),
+            Command::Argument.new("cert", :optlong, "/nonexistent/cert.pem"),
+            Command::Argument.new("dataset", :optlong, "ds-1")
+          ]).run
+        end
+      end
     end
   end
 end

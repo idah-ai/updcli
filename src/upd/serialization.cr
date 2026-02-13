@@ -9,6 +9,14 @@ module UPD
     # These tables MUST always be serialized in this exact order
     CORE_TABLES_ORDER = ["entries", "annotations"]
 
+    # Validate table name to prevent SQL injection
+    # Table names must only contain alphanumeric characters and underscores
+    def self.validate_table_name(table_name : String)
+      unless table_name.matches?(/^[a-zA-Z_][a-zA-Z0-9_]*$/)
+        raise "Invalid table name: #{table_name}. Table names must start with a letter or underscore and contain only alphanumeric characters and underscores."
+      end
+    end
+
     # Canonical data type serialization per RFC Section 5.4.4
     def self.normalized_query_columns(columns)
       columns.map do |column|
@@ -67,8 +75,11 @@ module UPD
     # Get table columns from information_schema (robust, handles complex CREATE statements)
     # Per RFC 5.4.3: Columns must be in ordinal_position order
     def self.get_table_columns(database, table_name : String)
+      validate_table_name(table_name)
+
       database.query_all(
-        "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '#{table_name}' ORDER BY ordinal_position ASC"
+        "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = ? ORDER BY ordinal_position ASC",
+        table_name
       ) do |row|
         {
           name: row.read(String),
@@ -79,36 +90,36 @@ module UPD
 
     # Get WHERE clause for filtering table by dataset
     # Per RFC 5.4.1
-    def self.get_where_clause(table_name : String, dataset_id : String) : String
+    # Returns tuple of {clause, params} for safe parameterized queries
+    def self.get_where_clause(table_name : String, dataset_id : String) : {String, Array(String)}
       case table_name
       when "entries"
-        "WHERE dataset_id = '#{dataset_id}'"
+        {"WHERE dataset_id = ?", [dataset_id]}
       when "annotations"
         # RFC 5.4.1: annotations filtered by entry_id IN (SELECT id FROM entries WHERE dataset_id = ...)
-        "WHERE entry_id IN (SELECT id FROM entries WHERE dataset_id = '#{dataset_id}')"
+        {"WHERE entry_id IN (SELECT id FROM entries WHERE dataset_id = ?)", [dataset_id]}
       else
         # For flavor tables, assume they have dataset_id column
         # This should be validated or documented in the flavor spec
-        "WHERE dataset_id = '#{dataset_id}'"
+        {"WHERE dataset_id = ?", [dataset_id]}
       end
     end
 
     # Serialize a single table for a dataset
     # Returns the canonical byte stream per RFC Section 5.4
     def self.serialize_table(database, table_name : String, dataset_id : String) : String
+      validate_table_name(table_name)
+
       # Get columns from information_schema (guarantees correct ordinal order)
       columns = get_table_columns(database, table_name)
 
       query_columns = normalized_query_columns(columns)
-      where_clause = get_where_clause(table_name, dataset_id)
+      where_clause, where_params = get_where_clause(table_name, dataset_id)
 
-      database.query_all(
-        <<-EOF
-          SELECT #{query_columns.join(", ")} FROM #{table_name}
-          #{where_clause}
-          ORDER BY id ASC
-        EOF
-      ) do |row|
+      # Build query - table_name is validated above, safe to interpolate
+      query = "SELECT #{query_columns.join(", ")} FROM #{table_name} #{where_clause} ORDER BY id ASC"
+
+      database.query_all(query, args: where_params) do |row|
         columns.map do |column|
           read_column(column, row)
         end.join("\x00COL\x00")
@@ -119,6 +130,9 @@ module UPD
     # Per RFC Section 5.4
     # Supports multiple algorithms per RFC Section 9 Appendix A
     def self.compute_data_hash(database, dataset_id : String, tables_to_serialize : Array(String), algorithm : String = "SHA256") : String
+      # Validate all table names first
+      tables_to_serialize.each { |table_name| validate_table_name(table_name) }
+
       # Serialize each table (columns are fetched from information_schema inside serialize_table)
       # Hash the serialized data using specified algorithm
       digest = case algorithm
@@ -142,10 +156,15 @@ module UPD
     # Per RFC Section 5.5
     # Supports multiple algorithms per RFC Section 9 Appendix A
     def self.compute_schema_hash(database, tables : Array(String), algorithm : String = "SHA256") : String
+      # Validate all table names first
+      tables.each { |table_name| validate_table_name(table_name) }
+
       # Get CREATE TABLE statements for all tables
       sql_create_stmts = tables.map do |table_name|
+        # table_name is validated above, safe to use in query
         database.query_one(
-          "SELECT sql FROM duckdb_tables WHERE table_name = '#{table_name}'"
+          "SELECT sql FROM duckdb_tables WHERE table_name = ?",
+          table_name
         ) { |r| r.read(String) }
       end.compact
 

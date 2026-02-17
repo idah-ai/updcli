@@ -336,4 +336,184 @@ describe "Command::Annotation" do
       ]).run
     end
   end
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  describe "Update" do
+    it "updates the shape_type" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO annotations VALUES ('a-1', 'e-1', 'bbox', '{\"x\":0}', '{\"label\":\"cat\"}', '{}')")
+        db.close
+      end
+
+      Command::Root.new([
+        Command::Argument.new("input", :optlong, "test.upd"),
+        Command::Argument.new("annotation", :pos, nil),
+        Command::Argument.new("update", :pos, nil),
+        Command::Argument.new("id", :optlong, "a-1"),
+        Command::Argument.new("type", :optlong, "polygon"),
+      ]).run
+
+      DB.open("duckdb://test.upd") do |db|
+        shape_type = db.query_one("SELECT shape_type FROM annotations WHERE id = 'a-1'", as: String)
+        shape_type.should eq("polygon")
+        db.close
+      end
+    end
+
+    it "updates the shape_args" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO annotations VALUES ('a-1', 'e-1', 'bbox', '{\"x\":0}', '{\"label\":\"cat\"}', '{}')")
+        db.close
+      end
+
+      Command::Root.new([
+        Command::Argument.new("input", :optlong, "test.upd"),
+        Command::Argument.new("annotation", :pos, nil),
+        Command::Argument.new("update", :pos, nil),
+        Command::Argument.new("id", :optlong, "a-1"),
+        Command::Argument.new("shape", :optlong, "{\"x\":10,\"y\":20,\"w\":50,\"h\":50}"),
+      ]).run
+
+      DB.open("duckdb://test.upd") do |db|
+        shape_args = JSON.parse(db.query_one("SELECT shape_args FROM annotations WHERE id = 'a-1'", as: String))
+        shape_args["x"].as_i.should eq(10)
+        shape_args["y"].as_i.should eq(20)
+        db.close
+      end
+    end
+
+    it "updates the annotation value" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO annotations VALUES ('a-1', 'e-1', 'bbox', '{\"x\":0}', '{\"label\":\"cat\"}', '{}')")
+        db.close
+      end
+
+      Command::Root.new([
+        Command::Argument.new("input", :optlong, "test.upd"),
+        Command::Argument.new("annotation", :pos, nil),
+        Command::Argument.new("update", :pos, nil),
+        Command::Argument.new("id", :optlong, "a-1"),
+        Command::Argument.new("annotation", :optlong, "{\"label\":\"dog\",\"score\":0.9}"),
+      ]).run
+
+      DB.open("duckdb://test.upd") do |db|
+        ann = JSON.parse(db.query_one("SELECT annotation FROM annotations WHERE id = 'a-1'", as: String))
+        ann["label"].as_s.should eq("dog")
+        ann["score"].as_f.should eq(0.9)
+        db.close
+      end
+    end
+
+    it "preserves unchanged fields when partially updating" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO annotations VALUES ('a-1', 'e-1', 'bbox', '{\"x\":0}', '{\"label\":\"cat\"}', '{}')")
+        db.close
+      end
+
+      Command::Root.new([
+        Command::Argument.new("input", :optlong, "test.upd"),
+        Command::Argument.new("annotation", :pos, nil),
+        Command::Argument.new("update", :pos, nil),
+        Command::Argument.new("id", :optlong, "a-1"),
+        Command::Argument.new("type", :optlong, "polygon"),
+      ]).run
+
+      DB.open("duckdb://test.upd") do |db|
+        row = db.query_one(
+          "SELECT shape_type, shape_args, annotation, entry_id FROM annotations WHERE id = 'a-1'",
+          as: {String, String, String, String}
+        )
+        row[0].should eq("polygon")                        # updated
+        JSON.parse(row[1])["x"].as_i.should eq(0)         # shape_args unchanged
+        JSON.parse(row[2])["label"].as_s.should eq("cat") # annotation unchanged
+        row[3].should eq("e-1")                           # entry_id unchanged
+        db.close
+      end
+    end
+
+    it "injects Updated-At and Updated-By into metadata" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO annotations VALUES ('a-1', 'e-1', 'bbox', '{\"x\":0}', '{\"label\":\"cat\"}', '{}')")
+        db.close
+      end
+
+      Command::Root.new([
+        Command::Argument.new("input", :optlong, "test.upd"),
+        Command::Argument.new("annotation", :pos, nil),
+        Command::Argument.new("update", :pos, nil),
+        Command::Argument.new("id", :optlong, "a-1"),
+        Command::Argument.new("type", :optlong, "polygon"),
+      ]).run
+
+      DB.open("duckdb://test.upd") do |db|
+        metadata = JSON.parse(db.query_one("SELECT metadata FROM annotations WHERE id = 'a-1'", as: String))
+        metadata["Updated-At"].as_s?.should_not be_nil
+        metadata["Updated-By"].as_s.should eq("updcli")
+        db.close
+      end
+    end
+
+    it "raises when annotation not found" do
+      expect_raises(Command::UpdError, /not found/) do
+        Command::Root.new([
+          Command::Argument.new("input", :optlong, "test.upd"),
+          Command::Argument.new("annotation", :pos, nil),
+          Command::Argument.new("update", :pos, nil),
+          Command::Argument.new("id", :optlong, "nonexistent"),
+          Command::Argument.new("type", :optlong, "polygon"),
+        ]).run
+      end
+    end
+
+    it "raises on invalid JSON in new shape" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO annotations VALUES ('a-1', 'e-1', 'bbox', '{\"x\":0}', '{\"label\":\"cat\"}', '{}')")
+        db.close
+      end
+
+      expect_raises(Command::UpdError, /Invalid JSON in new shape/) do
+        Command::Root.new([
+          Command::Argument.new("input", :optlong, "test.upd"),
+          Command::Argument.new("annotation", :pos, nil),
+          Command::Argument.new("update", :pos, nil),
+          Command::Argument.new("id", :optlong, "a-1"),
+          Command::Argument.new("shape", :optlong, "not valid json"),
+        ]).run
+      end
+    end
+
+    it "raises on invalid JSON in new annotation value" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO annotations VALUES ('a-1', 'e-1', 'bbox', '{\"x\":0}', '{\"label\":\"cat\"}', '{}')")
+        db.close
+      end
+
+      expect_raises(Command::UpdError, /Invalid JSON in new annotation/) do
+        Command::Root.new([
+          Command::Argument.new("input", :optlong, "test.upd"),
+          Command::Argument.new("annotation", :pos, nil),
+          Command::Argument.new("update", :pos, nil),
+          Command::Argument.new("id", :optlong, "a-1"),
+          Command::Argument.new("annotation", :optlong, "not valid json"),
+        ]).run
+      end
+    end
+
+    it "raises on invalid JSON in new metadata" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO annotations VALUES ('a-1', 'e-1', 'bbox', '{\"x\":0}', '{\"label\":\"cat\"}', '{}')")
+        db.close
+      end
+
+      expect_raises(Command::UpdError, /Invalid JSON in new metadata/) do
+        Command::Root.new([
+          Command::Argument.new("input", :optlong, "test.upd"),
+          Command::Argument.new("annotation", :pos, nil),
+          Command::Argument.new("update", :pos, nil),
+          Command::Argument.new("id", :optlong, "a-1"),
+          Command::Argument.new("metadata", :optlong, "not valid json"),
+        ]).run
+      end
+    end
+  end
 end

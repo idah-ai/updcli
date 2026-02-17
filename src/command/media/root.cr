@@ -3,6 +3,7 @@ require "./create"
 require "./show"
 require "./delete"
 require "./extract"
+require "./update"
 
 module Command
   module Media
@@ -13,6 +14,7 @@ module Command
       sub_command "show", Show
       sub_command "delete", Delete
       sub_command "extract", Extract
+      sub_command "update", Update
 
       def run_impl
         print_help

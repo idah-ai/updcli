@@ -288,4 +288,122 @@ describe "Command::Entry" do
       ]).run
     end
   end
+  # ─────────────────────────────────────────────────────────────────────────────
+  describe "Update" do
+    it "updates the media_url" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'https://old.example.com/img.jpg', '{}')")
+        db.close
+      end
+
+      Command::Root.new([
+        Command::Argument.new("input", :optlong, "test.upd"),
+        Command::Argument.new("entry", :pos, nil),
+        Command::Argument.new("update", :pos, nil),
+        Command::Argument.new("id", :optlong, "e-1"),
+        Command::Argument.new("url", :optlong, "https://new.example.com/img.jpg"),
+      ]).run
+
+      DB.open("duckdb://test.upd") do |db|
+        url = db.query_one("SELECT media_url FROM entries WHERE id = 'e-1'", as: String)
+        url.should eq("https://new.example.com/img.jpg")
+        db.close
+      end
+    end
+
+    it "preserves unchanged fields when partially updating" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'https://example.com/img.jpg', '{}')")
+        db.close
+      end
+
+      Command::Root.new([
+        Command::Argument.new("input", :optlong, "test.upd"),
+        Command::Argument.new("entry", :pos, nil),
+        Command::Argument.new("update", :pos, nil),
+        Command::Argument.new("id", :optlong, "e-1"),
+        Command::Argument.new("url", :optlong, "https://new.example.com/img.jpg"),
+      ]).run
+
+      DB.open("duckdb://test.upd") do |db|
+        row = db.query_one("SELECT dataset_id, media_url FROM entries WHERE id = 'e-1'", as: {String, String})
+        row[0].should eq("ds-1") # dataset_id unchanged
+        row[1].should eq("https://new.example.com/img.jpg")
+        db.close
+      end
+    end
+
+    it "replaces metadata with newly provided metadata" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'https://example.com/img.jpg', '{\"old_key\":\"old_val\"}')")
+        db.close
+      end
+
+      Command::Root.new([
+        Command::Argument.new("input", :optlong, "test.upd"),
+        Command::Argument.new("entry", :pos, nil),
+        Command::Argument.new("update", :pos, nil),
+        Command::Argument.new("id", :optlong, "e-1"),
+        Command::Argument.new("metadata", :optlong, "{\"new_key\":\"new_val\"}"),
+      ]).run
+
+      DB.open("duckdb://test.upd") do |db|
+        metadata = JSON.parse(db.query_one("SELECT metadata FROM entries WHERE id = 'e-1'", as: String))
+        metadata["new_key"].as_s.should eq("new_val")
+        metadata["old_key"]?.should be_nil
+        db.close
+      end
+    end
+
+    it "injects Updated-At and Updated-By into metadata" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'https://example.com/img.jpg', '{}')")
+        db.close
+      end
+
+      Command::Root.new([
+        Command::Argument.new("input", :optlong, "test.upd"),
+        Command::Argument.new("entry", :pos, nil),
+        Command::Argument.new("update", :pos, nil),
+        Command::Argument.new("id", :optlong, "e-1"),
+        Command::Argument.new("url", :optlong, "https://new.example.com/img.jpg"),
+      ]).run
+
+      DB.open("duckdb://test.upd") do |db|
+        metadata = JSON.parse(db.query_one("SELECT metadata FROM entries WHERE id = 'e-1'", as: String))
+        metadata["Updated-At"].as_s?.should_not be_nil
+        metadata["Updated-By"].as_s.should eq("updcli")
+        db.close
+      end
+    end
+
+    it "raises when entry not found" do
+      expect_raises(Command::UpdError, /not found/) do
+        Command::Root.new([
+          Command::Argument.new("input", :optlong, "test.upd"),
+          Command::Argument.new("entry", :pos, nil),
+          Command::Argument.new("update", :pos, nil),
+          Command::Argument.new("id", :optlong, "nonexistent"),
+          Command::Argument.new("url", :optlong, "https://example.com/img.jpg"),
+        ]).run
+      end
+    end
+
+    it "raises on invalid JSON in new metadata" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'https://example.com/img.jpg', '{}')")
+        db.close
+      end
+
+      expect_raises(Command::UpdError, /Invalid JSON in new metadata/) do
+        Command::Root.new([
+          Command::Argument.new("input", :optlong, "test.upd"),
+          Command::Argument.new("entry", :pos, nil),
+          Command::Argument.new("update", :pos, nil),
+          Command::Argument.new("id", :optlong, "e-1"),
+          Command::Argument.new("metadata", :optlong, "not valid json"),
+        ]).run
+      end
+    end
+  end
 end

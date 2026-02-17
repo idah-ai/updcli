@@ -512,4 +512,207 @@ describe "Command::Media" do
       ]).run
     end
   end
+  # ─────────────────────────────────────────────────────────────────────────────
+  describe "Update" do
+    it "updates the blob content from a new file" do
+      with_temp_file("old.jpg", "old content") do |old_path|
+        DB.open("duckdb://test.upd") do |db|
+          db.exec("INSERT INTO medias VALUES ('m-1', '', ?, 'image/jpeg', '{}')", File.read(old_path).to_slice)
+          db.close
+        end
+
+        with_temp_file("new.jpg", "new content") do |new_path|
+          Command::Root.new([
+            Command::Argument.new("input", :optlong, "test.upd"),
+            Command::Argument.new("media", :pos, nil),
+            Command::Argument.new("update", :pos, nil),
+            Command::Argument.new("id", :optlong, "m-1"),
+            Command::Argument.new("key", :optlong, ""),
+            Command::Argument.new("file", :optlong, new_path),
+          ]).run
+
+          DB.open("duckdb://test.upd") do |db|
+            blob = db.query_one("SELECT blob_data FROM medias WHERE id = 'm-1'", as: Bytes)
+            String.new(blob).should eq("new content")
+            db.close
+          end
+        end
+      end
+    end
+
+    it "updates the MIME type when a new file is provided" do
+      with_temp_file("photo.jpg", "jpeg content") do |old_path|
+        DB.open("duckdb://test.upd") do |db|
+          db.exec("INSERT INTO medias VALUES ('m-1', '', ?, 'image/jpeg', '{}')", File.read(old_path).to_slice)
+          db.close
+        end
+
+        with_temp_file("photo.png", "png content") do |new_path|
+          Command::Root.new([
+            Command::Argument.new("input", :optlong, "test.upd"),
+            Command::Argument.new("media", :pos, nil),
+            Command::Argument.new("update", :pos, nil),
+            Command::Argument.new("id", :optlong, "m-1"),
+            Command::Argument.new("key", :optlong, ""),
+            Command::Argument.new("file", :optlong, new_path),
+          ]).run
+
+          DB.open("duckdb://test.upd") do |db|
+            media_type = db.query_one("SELECT media_type FROM medias WHERE id = 'm-1'", as: String)
+            media_type.should eq(MIME.from_filename("photo.png"))
+            db.close
+          end
+        end
+      end
+    end
+
+    it "overrides auto-detected MIME type when mimetype is explicitly provided" do
+      with_temp_file("data.jpg", "content") do |path|
+        DB.open("duckdb://test.upd") do |db|
+          db.exec("INSERT INTO medias VALUES ('m-1', '', ?, 'image/jpeg', '{}')", File.read(path).to_slice)
+          db.close
+        end
+
+        with_temp_file("new.jpg", "new content") do |new_path|
+          Command::Root.new([
+            Command::Argument.new("input", :optlong, "test.upd"),
+            Command::Argument.new("media", :pos, nil),
+            Command::Argument.new("update", :pos, nil),
+            Command::Argument.new("id", :optlong, "m-1"),
+            Command::Argument.new("key", :optlong, ""),
+            Command::Argument.new("file", :optlong, new_path),
+            Command::Argument.new("mimetype", :optlong, "application/octet-stream"),
+          ]).run
+
+          DB.open("duckdb://test.upd") do |db|
+            media_type = db.query_one("SELECT media_type FROM medias WHERE id = 'm-1'", as: String)
+            media_type.should eq("application/octet-stream")
+            db.close
+          end
+        end
+      end
+    end
+
+    it "updates only the specific key variant (composite PK)" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO medias VALUES ('m-1', 'full', ?, 'image/jpeg', '{}')", "full content".to_slice)
+        db.exec("INSERT INTO medias VALUES ('m-1', 'thumbnail', ?, 'image/jpeg', '{}')", "thumb content".to_slice)
+        db.close
+      end
+
+      with_temp_file("new_full.jpg", "updated full content") do |path|
+        Command::Root.new([
+          Command::Argument.new("input", :optlong, "test.upd"),
+          Command::Argument.new("media", :pos, nil),
+          Command::Argument.new("update", :pos, nil),
+          Command::Argument.new("id", :optlong, "m-1"),
+          Command::Argument.new("key", :optlong, "full"),
+          Command::Argument.new("file", :optlong, path),
+        ]).run
+
+        DB.open("duckdb://test.upd") do |db|
+          full_blob = db.query_one("SELECT blob_data FROM medias WHERE id = 'm-1' AND key = 'full'", as: Bytes)
+          thumb_blob = db.query_one("SELECT blob_data FROM medias WHERE id = 'm-1' AND key = 'thumbnail'", as: Bytes)
+          String.new(full_blob).should eq("updated full content")
+          String.new(thumb_blob).should eq("thumb content") # unchanged
+          db.close
+        end
+      end
+    end
+
+    it "replaces metadata with newly provided metadata" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO medias VALUES ('m-1', '', NULL, 'image/jpeg', '{\"old_key\":\"old_val\"}')")
+        db.close
+      end
+
+      Command::Root.new([
+        Command::Argument.new("input", :optlong, "test.upd"),
+        Command::Argument.new("media", :pos, nil),
+        Command::Argument.new("update", :pos, nil),
+        Command::Argument.new("id", :optlong, "m-1"),
+        Command::Argument.new("key", :optlong, ""),
+        Command::Argument.new("metadata", :optlong, "{\"new_key\":\"new_val\"}"),
+      ]).run
+
+      DB.open("duckdb://test.upd") do |db|
+        metadata = JSON.parse(db.query_one("SELECT metadata FROM medias WHERE id = 'm-1'", as: String))
+        metadata["new_key"].as_s.should eq("new_val")
+        metadata["old_key"]?.should be_nil
+        db.close
+      end
+    end
+
+    it "injects Updated-At and Updated-By into metadata" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO medias VALUES ('m-1', '', NULL, 'image/jpeg', '{}')")
+        db.close
+      end
+
+      Command::Root.new([
+        Command::Argument.new("input", :optlong, "test.upd"),
+        Command::Argument.new("media", :pos, nil),
+        Command::Argument.new("update", :pos, nil),
+        Command::Argument.new("id", :optlong, "m-1"),
+        Command::Argument.new("key", :optlong, ""),
+        Command::Argument.new("metadata", :optlong, "{\"source\":\"camera\"}"),
+      ]).run
+
+      DB.open("duckdb://test.upd") do |db|
+        metadata = JSON.parse(db.query_one("SELECT metadata FROM medias WHERE id = 'm-1'", as: String))
+        metadata["Updated-At"].as_s?.should_not be_nil
+        metadata["Updated-By"].as_s.should eq("updcli")
+        db.close
+      end
+    end
+
+    it "raises when media id and key combination not found" do
+      expect_raises(Command::UpdError, /not found/) do
+        Command::Root.new([
+          Command::Argument.new("input", :optlong, "test.upd"),
+          Command::Argument.new("media", :pos, nil),
+          Command::Argument.new("update", :pos, nil),
+          Command::Argument.new("id", :optlong, "nonexistent"),
+          Command::Argument.new("key", :optlong, ""),
+          Command::Argument.new("metadata", :optlong, "{\"x\":1}"),
+        ]).run
+      end
+    end
+
+    it "raises when new file path does not exist" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO medias VALUES ('m-1', '', NULL, 'image/jpeg', '{}')")
+        db.close
+      end
+
+      expect_raises(Command::UpdError, /File not found/) do
+        Command::Root.new([
+          Command::Argument.new("input", :optlong, "test.upd"),
+          Command::Argument.new("media", :pos, nil),
+          Command::Argument.new("update", :pos, nil),
+          Command::Argument.new("id", :optlong, "m-1"),
+          Command::Argument.new("key", :optlong, ""),
+          Command::Argument.new("file", :optlong, "/nonexistent/path/file.jpg"),
+        ]).run
+      end
+    end
+
+    it "raises on invalid JSON in new metadata" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO medias VALUES ('m-1', '', NULL, 'image/jpeg', '{}')")
+        db.close
+      end
+
+      expect_raises(Command::UpdError, /Invalid JSON in new metadata/) do
+        Command::Root.new([
+          Command::Argument.new("input", :optlong, "test.upd"),
+          Command::Argument.new("media", :pos, nil),
+          Command::Argument.new("update", :pos, nil),
+          Command::Argument.new("id", :optlong, "m-1"),
+          Command::Argument.new("key", :optlong, ""),
+          Command::Argument.new("metadata", :optlong, "not valid json"),
+        ]).run
+      end
+    end
+  end
 end

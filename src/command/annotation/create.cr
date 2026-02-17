@@ -1,6 +1,8 @@
 module Command
   module Annotation
     class Create < Base
+      Log = ::Log.for("annotation:create")
+
       description "Create an entry"
       option "id", "i", "id", required: false, type: :string
       option "entry_id", "e", "entry id", required: true, type: :string
@@ -10,7 +12,7 @@ module Command
       option "metadata", "h", "metadata", required: false, type: :string
 
       def run_impl
-        puts root.database.exec(
+        result = root.database.exec(
           "INSERT into annotations values (?, ?, ?, ?, ?, ?)", # ?,...
           args: [
             option("id") || UUID.v7.to_s,
@@ -25,6 +27,7 @@ module Command
             }.to_json
           ]
         )
+        Log.info { result }
       end
     end
   end

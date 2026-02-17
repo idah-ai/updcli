@@ -1,6 +1,8 @@
 module Command
   module Entry
     class List < Base
+      Log = ::Log.for("entry:list")
+
       description "List the entries"
 
       def run_impl
@@ -12,10 +14,10 @@ module Command
         end
 
         if entries.empty?
-          puts "No entries found."
+          Log.warn {"No entries found."}
         else
           entries.each do |entry|
-            puts entry.to_json
+            Log.info { entry.to_json }
           end
         end
       end

@@ -1,6 +1,8 @@
 module Command
   module Entry
     class Create < Base
+      Log = ::Log.for("entry:create")
+
       description "Create an entry"
       option "id", "i", "id", required: false, type: :string
       option "dataset_id", "d", "dataset id", required: true, type: :string
@@ -8,7 +10,7 @@ module Command
       option "metadata", "h", "metadata", required: false, type: :string
 
       def run_impl
-        puts root.database.exec(
+        result = root.database.exec(
           "INSERT into entries values (?, ?, ?, ?)", # ?,...
           args: [
             option("id") || UUID.v7.to_s,
@@ -21,6 +23,8 @@ module Command
             }.to_json
           ]
         )
+
+        Log.info {result}
       end
     end
   end

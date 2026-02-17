@@ -9,6 +9,9 @@ Log.define_formatter LogFormat, "#{severity} | #{message}"
 Command::Parser.parse(ARGV).tap do |args|
   command = Command::Root.new(args)
   command.run
+rescue e : Command::UpdError
+  STDERR.puts e.message
+  exit 1
 rescue e : Command::Error
   STDERR.puts e.message
   e.command.print_help

@@ -1,6 +1,7 @@
 module Command
   module Metadata
     class Show < Base
+      Log = ::Log.for("metadata:show")
       description "Show Metadata"
 
       def run_impl
@@ -13,9 +14,9 @@ module Command
           ]
         end
         if metadatas.empty?
-          puts "No metadatas found."
+          Log.info { "No metadatas found." }
         else
-          puts metadatas.to_h.to_json
+          Log.info { metadatas.to_h.to_json }
         end
       end
     end

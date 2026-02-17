@@ -1,6 +1,8 @@
 module Command
   module Media
     class Show < Base
+      Log = ::Log.for("media:show")
+
       description "Show a Media"
       option "id", "i", "id", required: true, type: :string
 
@@ -15,10 +17,10 @@ module Command
           }
         end
         if medias.empty?
-          puts "No Medias found."
+          Log.warn {"No Medias found."}
         else
           medias.each do |media|
-            puts media.to_json
+            Log.info {media.to_json}
           end
         end
       end

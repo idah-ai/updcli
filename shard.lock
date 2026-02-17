@@ -8,3 +8,7 @@ shards:
     git: https://github.com/amauryt/crystal-duckdb.git
     version: 0.2.5
 
+  openssl_ext:
+    git: https://github.com/spider-gazelle/openssl_ext.git
+    version: 2.8.3
+

@@ -4,6 +4,7 @@ module Command
   module Media
     class Extract < Base
       # add option to show/list in place ?
+      Log = ::Log.for("media:extract")
       description "extract"
 
       option "id", "i", "id", required: true, type: :string
@@ -22,11 +23,12 @@ module Command
           }
         end
         if medias.empty?
-          puts "No Medias found."
+          Log.info { "No Medias found." }
         else
           medias.each do |media|
             File.open(option("output") || media[:id].to_s, "w") do |file|
               file.write(media[:blob].to_slice)
+              Log.info { "#{file.path} extracted" }
             end
           end
         end

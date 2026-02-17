@@ -1,6 +1,8 @@
 module Command
   module Annotation
     class Show < Base
+      Log = ::Log.for("annotation:show")
+
       description "Show an annotation"
 
       option "id", "i", "id", required: true, type: :string
@@ -17,10 +19,10 @@ module Command
         end
 
         if annotations.empty?
-          puts "No annotation found."
+          Log.warn {"No annotation found."}
         else
           annotations.each do |a|
-            puts a.to_json
+            Log.info { a.to_json }
           end
         end
       end

@@ -1,6 +1,7 @@
 module Command
   module Annotation
     class List < Base
+      Log = ::Log.for("annotation:list")
       description "List the annotations"
 
       def run_impl
@@ -16,10 +17,10 @@ module Command
         end
 
         if annotations.empty?
-          puts "No annotation found."
+          Log.info { "No annotation found." }
         else
           annotations.each do |a|
-            puts a.to_json
+            Log.info { a.to_json }
           end
         end
       end

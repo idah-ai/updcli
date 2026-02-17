@@ -1,6 +1,8 @@
 module Command
   module Dataset
     class List < Base
+      Log = ::Log.for("dataset:list")
+
       description "List the datasets"
 
       def run_impl
@@ -13,10 +15,10 @@ module Command
           }
         end
         if datasets.empty?
-          puts "No datasets found."
+          Log.info {"No datasets found."}
         else
           datasets.each do |dataset|
-            puts dataset.to_json
+            Log.info {dataset.to_json}
           end
         end
       end

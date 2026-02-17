@@ -104,15 +104,14 @@ module VerifySpecHelpers
 end
 
 describe Command::Verify do
-  # Setup and teardown database
-  Spec.before_each do
+  before_each do
     Command::Root.new([
       Command::Argument.new("input", :optlong, "test.upd"),
       Command::Argument.new("init", :pos, nil),
     ]).run
   end
 
-  Spec.after_each do
+  after_each do
     FileUtils.rm_rf("test.upd")
   end
 

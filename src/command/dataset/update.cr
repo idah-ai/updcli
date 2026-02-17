@@ -3,6 +3,8 @@ require "uuid"
 module Command
   module Dataset
     class Update < Base
+      Log = ::Log.for("dataset:update")
+
       description "Update dataset"
 
       option "id", "i", "Dataset ID", required: true, type: :string
@@ -18,7 +20,7 @@ module Command
           as: {String, String, String}
         )
 
-        raise "Dataset '#{option("id")}' not found" unless dataset
+        raise Command::UpdError.new("Dataset '#{option("id")}' not found", self) unless dataset
 
         current_name, current_modality, current_metadata = dataset
 
@@ -28,13 +30,13 @@ module Command
           begin
             JSON.parse(metadata_option).as_h
           rescue ex : JSON::ParseException
-            raise "Invalid JSON in new metadata: #{ex.message}"
+            raise Command::UpdError.new("Invalid JSON in new metadata: #{ex.message}", self)
           end
         else
           begin
             JSON.parse(current_metadata).as_h
           rescue ex : JSON::ParseException
-            raise "Existing dataset metadata contains invalid JSON: #{ex.message}"
+            raise Command::UpdError.new("Existing dataset metadata contains invalid JSON: #{ex.message}", self)
           end
         end
 
@@ -42,7 +44,7 @@ module Command
         metadata["Updated-By"] = JSON::Any.new("updcli")
 
         # Update database
-        puts root.database.exec(
+        result = root.database.exec(
           "UPDATE datasets SET name = ?, modality = ?, metadata = ? WHERE id = ?",
           args: [
             option("name") || current_name,
@@ -51,6 +53,8 @@ module Command
             option("id")
           ]
         )
+
+        Log.info {result}
       end
     end
   end

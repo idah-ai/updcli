@@ -20,14 +20,14 @@ module Command
           begin
             metadata.merge!(JSON.parse(metadata_option).as_h)
           rescue ex : JSON::ParseException
-            raise "Invalid JSON metadata: #{ex.message}"
+            raise Command::UpdError.new("Invalid JSON metadata: #{ex.message}", self)
           end
         end
 
         metadata["Created-At"] = JSON::Any.new(Time.local.to_s("%Y-%m-%d %H:%M:%S%:z"))
         metadata["Updated-At"] = JSON::Any.new(nil)
         metadata["Created-by"] = JSON::Any.new("updcli")
-        root.database.exec(
+        ret = root.database.exec(
           "INSERT into datasets (id, name, modality, metadata) values (?, ?, ?, ?)",
           args: [
             option("id") || UUID.v7.to_s,
@@ -36,6 +36,7 @@ module Command
             metadata.to_json
           ]
         )
+        Log.info { ret }
       end
     end
   end

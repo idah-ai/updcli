@@ -1,6 +1,8 @@
 module Command
   module Entry
     class Show < Base
+      Log = ::Log.for("entry:show")
+
       description "Show an entry"
       option "id", "i", "id", required: true, type: :string
 
@@ -16,10 +18,10 @@ module Command
         end
 
         if entries.empty?
-          puts "No entries found."
+          Log.warn { "No entries found." }
         else
           entries.each do |entry|
-            puts entry.to_json
+            Log.info { entry.to_json }
           end
         end
       end

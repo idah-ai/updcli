@@ -35,6 +35,8 @@ module Command
     end
 
   class Sign < Base
+    Log = ::Log.for("sign")
+
     description "Sign datasets with ECDSA signatures"
 
     # Define CLI options
@@ -106,12 +108,12 @@ module Command
       certificate = OpenSSL::X509::Certificate.new(cert_pem)
 
       if verbose
-        puts "Using private key: #{key_path}"
-        puts "Using certificate: #{cert_path}"
-        puts "Hash algorithm: #{algorithm}"
-        puts "ECDSA curve: #{curve}"
-        puts "Certificate subject: #{certificate.subject}"
-        puts "Certificate valid from #{certificate.not_before} to #{certificate.not_after}"
+        Log.info {"Using private key: #{key_path}"}
+        Log.info {"Using certificate: #{cert_path}"}
+        Log.info {"Hash algorithm: #{algorithm}"}
+        Log.info {"ECDSA curve: #{curve}"}
+        Log.info {"Certificate subject: #{certificate.subject}"}
+        Log.info {"Certificate valid from #{certificate.not_before} to #{certificate.not_after}"}
       end
 
       # Determine which datasets to sign
@@ -145,7 +147,7 @@ module Command
       end
 
       if datasets.empty?
-        puts "No datasets found to sign"
+        Log.warn {"No datasets found to sign"}
         return
       end
 
@@ -154,33 +156,33 @@ module Command
       all_tables = UPD::Serialization::CORE_TABLES_ORDER + flavor_tables
 
       if verbose
-        puts "Tables included in signature: #{all_tables.join(", ")}"
+        Log.info {"Tables included in signature: #{all_tables.join(", ")}"}
       end
 
       schemaHash = UPD::Serialization.compute_schema_hash(root.database, all_tables, algorithm)
 
       if verbose
-        puts "Schema hash: #{schemaHash}"
-        puts ""
+        Log.info { "Schema hash: #{schemaHash}" }
+        Log.info { "" }
       end
 
-      puts "Signing #{datasets.size} dataset(s)..."
-      puts ""
+      Log.info { "Signing #{datasets.size} dataset(s)..." }
+      Log.info { "" }
 
       datasets.each do |dataset|
         dataset_id = dataset[:id]
         dataset_name = dataset[:name]
         metadata = dataset[:metadata]
 
-        puts "Processing: #{dataset_name} (#{dataset_id})"
+        Log.info { "Processing: #{dataset_name} (#{dataset_id})"}
 
         # Compute data hash
         dataHash = UPD::Serialization.compute_data_hash(root.database, dataset_id, all_tables, algorithm)
-        puts "  Data hash: #{dataHash}" if verbose
+        Log.info { "  Data hash: #{dataHash}" if verbose}
 
         # Sign the data hash
         signature = ec_key.ec_sign(dataHash.hexbytes)
-        puts "  Signature: #{signature.size} bytes" if verbose
+        Log.info { "  Signature: #{signature.size} bytes" } if verbose
 
         # Parse existing metadata
         metadata_json = begin
@@ -222,11 +224,11 @@ module Command
           Argument.new("metadata", :optlong, metadata_json.to_json)
         ], root).run
 
-        puts "  ✓ Signed successfully (#{content_signatures.size} total signature(s))"
+        Log.info { "  ✓ Signed successfully (#{content_signatures.size} total signature(s))" }
       end
 
-      puts ""
-      puts "Signing complete!"
+      Log.info { "" }
+      Log.info { "Signing complete!" }
     end
   end
 end

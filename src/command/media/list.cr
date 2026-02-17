@@ -2,6 +2,8 @@ require "json"
 module Command
   module Media
     class List < Base
+      Log = ::Log.for("media:list")
+
       description "List the Medias"
 
       def run_impl
@@ -12,10 +14,10 @@ module Command
           }
         end
         if medias.empty?
-          puts "No Medias found."
+          Log.info {"No Medias found."}
         else
           medias.each do |media|
-            puts media.to_json
+            Log.info {media.to_json}
           end
         end
       end

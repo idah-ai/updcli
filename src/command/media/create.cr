@@ -3,6 +3,8 @@ require "mime"
 module Command
   module Media
     class Create < Base
+      Log = ::Log.for("media:create")
+
       description "create"
 
       option "id", "i", "id", required: false, type: :string
@@ -12,7 +14,7 @@ module Command
       option "metadata", "h", "metadata", required: false, type: :string
 
       def run_impl
-        puts root.database.exec(
+        result = root.database.exec(
           "INSERT into medias values (?, ?, ?, ?, ?)", # ?,...
           args: [
             option("id") || [
@@ -33,6 +35,8 @@ module Command
             }.to_json
           ]
         )
+
+        Log.info {result}
       end
     end
   end

@@ -1,3 +1,4 @@
+
 require "spec"
 require "json"
 require "base64"
@@ -113,13 +114,14 @@ end
 
 describe Command::Sign do
   # ...
-  Spec.before_each do
+  before_each do
     Command::Root.new([
       Command::Argument.new("input", :optlong, "test.upd"),
       Command::Argument.new("init", :pos, nil),
     ]).run
   end
-  Spec.after_each do
+
+  after_each do
     FileUtils.rm_rf("test.upd")
   end
   # ...

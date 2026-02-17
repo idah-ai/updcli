@@ -11,28 +11,28 @@ require "../upd/serialization"
 module Command
   record Signature,
     signature : String,
-    dataHashAlgorithm : String,
-    dataHash : String,
-    schemaHash : String,
+    data_hash_algorithm : String,
+    data_hash : String,
+    schema_hash : String,
     certificate : String,
     curve : String,
-    signedAt : String,
-    signedFlavorTables : Array(String) do
-      include JSON::Serializable
+    signed_at : String,
+    signed_flavor_tables : Array(String) do
+    include JSON::Serializable
 
-      def to_h
-        {
-          "signature" => signature,
-          "dataHashAlgorithm" => dataHashAlgorithm,
-          "dataHash" => dataHash,
-          "schemaHash" => schemaHash,
-          "certificate" => certificate,
-          "curve" => curve,
-          "signedAt" => signedAt,
-          "signedFlavorTables" => signedFlavorTables
-        }
-      end
+    def to_h
+      {
+        "signature"          => signature,
+        "dataHashAlgorithm"  => data_hash_algorithm,
+        "dataHash"           => data_hash,
+        "schemaHash"         => schema_hash,
+        "certificate"        => certificate,
+        "curve"              => curve,
+        "signedAt"           => signed_at,
+        "signedFlavorTables" => signed_flavor_tables,
+      }
     end
+  end
 
   class Sign < Base
     Log = ::Log.for("sign")
@@ -79,10 +79,10 @@ module Command
 
       # Parse flavor tables
       flavor_tables = if flavor_tables_str && !flavor_tables_str.empty?
-        flavor_tables_str.split(",").map(&.strip)
-      else
-        [] of String
-      end
+                        flavor_tables_str.split(",").map(&.strip)
+                      else
+                        [] of String
+                      end
 
       # Validate required files
       unless key_path && File.exists?(key_path)
@@ -108,46 +108,46 @@ module Command
       certificate = OpenSSL::X509::Certificate.new(cert_pem)
 
       if verbose
-        Log.info {"Using private key: #{key_path}"}
-        Log.info {"Using certificate: #{cert_path}"}
-        Log.info {"Hash algorithm: #{algorithm}"}
-        Log.info {"ECDSA curve: #{curve}"}
-        Log.info {"Certificate subject: #{certificate.subject}"}
-        Log.info {"Certificate valid from #{certificate.not_before} to #{certificate.not_after}"}
+        Log.info { "Using private key: #{key_path}" }
+        Log.info { "Using certificate: #{cert_path}" }
+        Log.info { "Hash algorithm: #{algorithm}" }
+        Log.info { "ECDSA curve: #{curve}" }
+        Log.info { "Certificate subject: #{certificate.subject}" }
+        Log.info { "Certificate valid from #{certificate.not_before} to #{certificate.not_after}" }
       end
 
       # Determine which datasets to sign
       datasets = if dataset_id && !dataset_id.empty?
-        # Sign specific dataset
-        result = root.database.query_all(
-          "SELECT id, name, metadata FROM datasets WHERE id = ?",
-          dataset_id
-        ) do |dataset|
-          {
-            id: dataset.read(String),
-            name: dataset.read(String),
-            metadata: dataset.read(String)
-          }
-        end
+                   # Sign specific dataset
+                   result = root.database.query_all(
+                     "SELECT id, name, metadata FROM datasets WHERE id = ?",
+                     dataset_id
+                   ) do |dataset|
+                     {
+                       id:       dataset.read(String),
+                       name:     dataset.read(String),
+                       metadata: dataset.read(String),
+                     }
+                   end
 
-        if result.empty?
-          raise Command::UpdError.new("Dataset not found: #{dataset_id}", self)
-        end
+                   if result.empty?
+                     raise Command::UpdError.new("Dataset not found: #{dataset_id}", self)
+                   end
 
-        result
-      else
-        # Sign all datasets
-        root.database.query_all("SELECT id, name, metadata FROM datasets") do |dataset|
-          {
-            id: dataset.read(String),
-            name: dataset.read(String),
-            metadata: dataset.read(String)
-          }
-        end
-      end
+                   result
+                 else
+                   # Sign all datasets
+                   root.database.query_all("SELECT id, name, metadata FROM datasets") do |dataset|
+                     {
+                       id:       dataset.read(String),
+                       name:     dataset.read(String),
+                       metadata: dataset.read(String),
+                     }
+                   end
+                 end
 
       if datasets.empty?
-        Log.warn {"No datasets found to sign"}
+        Log.warn { "No datasets found to sign" }
         return
       end
 
@@ -156,13 +156,13 @@ module Command
       all_tables = UPD::Serialization::CORE_TABLES_ORDER + flavor_tables
 
       if verbose
-        Log.info {"Tables included in signature: #{all_tables.join(", ")}"}
+        Log.info { "Tables included in signature: #{all_tables.join(", ")}" }
       end
 
-      schemaHash = UPD::Serialization.compute_schema_hash(root.database, all_tables, algorithm)
+      schema_hash = UPD::Serialization.compute_schema_hash(root.database, all_tables, algorithm)
 
       if verbose
-        Log.info { "Schema hash: #{schemaHash}" }
+        Log.info { "Schema hash: #{schema_hash}" }
         Log.info { "" }
       end
 
@@ -174,14 +174,14 @@ module Command
         dataset_name = dataset[:name]
         metadata = dataset[:metadata]
 
-        Log.info { "Processing: #{dataset_name} (#{dataset_id})"}
+        Log.info { "Processing: #{dataset_name} (#{dataset_id})" }
 
         # Compute data hash
-        dataHash = UPD::Serialization.compute_data_hash(root.database, dataset_id, all_tables, algorithm)
-        Log.info { "  Data hash: #{dataHash}" if verbose}
+        data_hash = UPD::Serialization.compute_data_hash(root.database, dataset_id, all_tables, algorithm)
+        Log.info { "  Data hash: #{data_hash}" if verbose }
 
         # Sign the data hash
-        signature = ec_key.ec_sign(dataHash.hexbytes)
+        signature = ec_key.ec_sign(data_hash.hexbytes)
         Log.info { "  Signature: #{signature.size} bytes" } if verbose
 
         # Parse existing metadata
@@ -206,8 +206,8 @@ module Command
         new_signature = Signature.new(
           Base64.strict_encode(signature),
           algorithm,
-          dataHash,
-          schemaHash,
+          data_hash,
+          schema_hash,
           Base64.strict_encode(certificate.to_pem),
           curve,
           Time.utc.to_rfc3339,
@@ -221,7 +221,7 @@ module Command
         # Update dataset metadata
         result = Dataset::Update.for([
           Argument.new("id", :optlong, dataset_id),
-          Argument.new("metadata", :optlong, metadata_json.to_json)
+          Argument.new("metadata", :optlong, metadata_json.to_json),
         ], root).run
 
         Log.info { "  ✓ Signed successfully (#{content_signatures.size} total signature(s))" }

@@ -7,20 +7,20 @@ module Command
       def run_impl
         annotations = root.database.query_all(
           "SELECT id, shape_type, annotation, shape_args FROM annotations;"
-        ) do |a|
+        ) do |ann|
           {
-            id: a.read(String),
-            shape_type: a.read(String),
-            annotation: JSON.parse(a.read(String)),
-            shape_args: JSON.parse(a.read(String))
+            id:         ann.read(String),
+            shape_type: ann.read(String),
+            annotation: JSON.parse(ann.read(String)),
+            shape_args: JSON.parse(ann.read(String)),
           }
         end
 
         if annotations.empty?
           Log.info { "No annotation found." }
         else
-          annotations.each do |a|
-            Log.info { a.to_json }
+          annotations.each do |ann|
+            Log.info { ann.to_json }
           end
         end
       end

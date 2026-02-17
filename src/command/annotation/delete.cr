@@ -12,7 +12,7 @@ module Command
         result = root.database.exec(
           "DELETE FROM annotations WHERE id = ?",
           args: [
-            option("id")
+            option("id"),
           ]
         )
 

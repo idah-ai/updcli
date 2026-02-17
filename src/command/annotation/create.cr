@@ -15,17 +15,17 @@ module Command
         result = root.database.exec(
           "INSERT into annotations values (?, ?, ?, ?, ?, ?)", # ?,...
           args: [
-            option("id") || UUID.v7.to_s,
-            option("entry_id"),
-            option("type"),
-            JSON.parse(option("shape") || "").to_json,
-            JSON.parse(option("annotation") || "").to_json,
-            option("metadata") || {
-              "Created-At": Time.local.to_s("%Y-%m-%d %H:%M:%S%:z"),
-              "Updated-At": nil,
-              "Created-by": "updcli"
-            }.to_json
-          ]
+          option("id") || UUID.v7.to_s,
+          option("entry_id"),
+          option("type"),
+          JSON.parse(option("shape") || "").to_json,
+          JSON.parse(option("annotation") || "").to_json,
+          option("metadata") || {
+            "Created-At": Time.local.to_s("%Y-%m-%d %H:%M:%S%:z"),
+            "Updated-At": nil,
+            "Created-by": "updcli",
+          }.to_json,
+        ]
         )
         Log.info { result }
       end

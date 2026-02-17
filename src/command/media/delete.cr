@@ -12,11 +12,11 @@ module Command
         result = root.database.exec(
           "DELETE FROM medias WHERE id = ?",
           args: [
-            option("id")
+            option("id"),
           ]
         )
 
-        Log.info {result}
+        Log.info { result }
       end
     end
   end

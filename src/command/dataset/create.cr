@@ -15,7 +15,7 @@ module Command
         metadata = {} of String => JSON::Any
 
         # Merge with user-provided metadata if any
-        metadata_option = option("metadata")  # Get the option value first
+        metadata_option = option("metadata") # Get the option value first
         if metadata_option
           begin
             metadata.merge!(JSON.parse(metadata_option).as_h)
@@ -33,7 +33,7 @@ module Command
             option("id") || UUID.v7.to_s,
             option("name"),
             option("modality"),
-            metadata.to_json
+            metadata.to_json,
           ]
         )
         Log.info { ret }

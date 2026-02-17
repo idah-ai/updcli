@@ -24,21 +24,20 @@ module Command
 
         current_name, current_modality, current_metadata = dataset
 
-
         metadata_option = option("metadata")
         metadata = if metadata_option
-          begin
-            JSON.parse(metadata_option).as_h
-          rescue ex : JSON::ParseException
-            raise Command::UpdError.new("Invalid JSON in new metadata: #{ex.message}", self)
-          end
-        else
-          begin
-            JSON.parse(current_metadata).as_h
-          rescue ex : JSON::ParseException
-            raise Command::UpdError.new("Existing dataset metadata contains invalid JSON: #{ex.message}", self)
-          end
-        end
+                     begin
+                       JSON.parse(metadata_option).as_h
+                     rescue ex : JSON::ParseException
+                       raise Command::UpdError.new("Invalid JSON in new metadata: #{ex.message}", self)
+                     end
+                   else
+                     begin
+                       JSON.parse(current_metadata).as_h
+                     rescue ex : JSON::ParseException
+                       raise Command::UpdError.new("Existing dataset metadata contains invalid JSON: #{ex.message}", self)
+                     end
+                   end
 
         metadata["Updated-At"] = JSON::Any.new(Time.local.to_s("%Y-%m-%d %H:%M:%S%:z"))
         metadata["Updated-By"] = JSON::Any.new("updcli")
@@ -50,11 +49,11 @@ module Command
             option("name") || current_name,
             option("modality") || current_modality,
             metadata.to_json,
-            option("id")
+            option("id"),
           ]
         )
 
-        Log.info {result}
+        Log.info { result }
       end
     end
   end

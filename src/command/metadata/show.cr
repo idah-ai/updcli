@@ -10,7 +10,7 @@ module Command
         ) do |metadata|
           [
             metadata.read(String),
-            metadata.read(String)
+            metadata.read(String),
           ]
         end
         if metadatas.empty?

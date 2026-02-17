@@ -17,9 +17,9 @@ module Command
           option("id")
         ) do |media|
           {
-            id: media.read(String),
+            id:         media.read(String),
             media_type: media.read(String),
-            blob: media.read(Slice(UInt8))
+            blob:       media.read(Slice(UInt8)),
           }
         end
         if medias.empty?

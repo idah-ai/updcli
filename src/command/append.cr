@@ -28,23 +28,20 @@ module Command
           file.each_line do |line|
             # Here you would parse the JSON line and append it to the UPD.
             # This is a placeholder for the actual append logic.
+            append_instruction = AppendInstruction.from_json(line.strip)
 
-            # TODO: Use of JSON Pull Parser for efficiency.
-
-            appendInstruction = AppendInstruction.from_json(line.strip)
-
-            args = appendInstruction.args.map do |k, v| # mapping from_json ?
+            args = append_instruction.args.map do |k, v| # mapping from_json ?
               Argument.new(k, :optlong, v.to_s)
             end # multi level sub commands args ?
 
-            command = root.class.get_command appendInstruction.command.split(":")
+            command = root.class.get_command append_instruction.command.split(":")
 
             if !command
-              raise "command not found: #{appendInstruction.command} (line #{i})"
+              raise "command not found: #{append_instruction.command} (line #{i})"
             else
               command.for(args, root).run
             end
-            i+=1
+            i += 1
           end
           root.database.exec("COMMIT")
         rescue e

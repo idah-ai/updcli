@@ -12,8 +12,8 @@ module Command
           option("id")
         ) do |entry|
           {
-            id: entry.read(String),
-            media_url: entry.read(String)
+            id:        entry.read(String),
+            media_url: entry.read(String),
           }
         end
 

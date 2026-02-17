@@ -1,6 +1,6 @@
 module Command
   class Init < Base
-    Log = ::Log.for("init")
+    Log    = ::Log.for("init")
     Schema = {{ read_file("sql/schema.sql") }}
 
     description "Initialize a new UPD file."
@@ -16,8 +16,7 @@ module Command
         raise Command::Error.new("Failed to execute statement: #{stmt}\nError: #{e.message}", self)
       end
 
-      Log.info{ "Generated empty UPD successfully." }
+      Log.info { "Generated empty UPD successfully." }
     end
-
   end
 end

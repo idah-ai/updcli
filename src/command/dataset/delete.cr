@@ -13,10 +13,10 @@ module Command
         result = root.database.exec(
           "DELETE FROM datasets WHERE id = ?",
           args: [
-            option("id")
+            option("id"),
           ]
         )
-        Log.info {result}
+        Log.info { result }
       end
     end
   end

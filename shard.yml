@@ -14,8 +14,14 @@ dependencies:
   openssl_ext:
     github: spider-gazelle/openssl_ext
 
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+
 targets:
   updcli:
     main: src/datset.cr
+  ameba:
+    main: bin/ameba.cr
 
 license: MPL

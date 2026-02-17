@@ -37,8 +37,8 @@ module Command
         return
       end
 
-      Log.info {"Verifying #{datasets.size} dataset(s)..."}
-      Log.info {""}
+      Log.info { "Verifying #{datasets.size} dataset(s)..." }
+      Log.info { "" }
 
       summary = verify_all_datasets(datasets, verbose, strict)
       print_summary(summary)
@@ -53,9 +53,9 @@ module Command
           dataset_id
         ) do |dataset|
           {
-            id: dataset.read(String),
-            name: dataset.read(String),
-            metadata: dataset.read(String)
+            id:       dataset.read(String),
+            name:     dataset.read(String),
+            metadata: dataset.read(String),
           }
         end
 
@@ -68,9 +68,9 @@ module Command
         # Verify all datasets
         root.database.query_all("SELECT id, name, metadata FROM datasets") do |dataset|
           {
-            id: dataset.read(String),
-            name: dataset.read(String),
-            metadata: dataset.read(String)
+            id:       dataset.read(String),
+            name:     dataset.read(String),
+            metadata: dataset.read(String),
           }
         end
       end
@@ -88,15 +88,15 @@ module Command
         dataset_name = dataset[:name]
         metadata = dataset[:metadata]
 
-        Log.info {"Dataset: #{dataset_name} (#{dataset_id})"}
-        Log.info {"-" * 80} if verbose
+        Log.info { "Dataset: #{dataset_name} (#{dataset_id})" }
+        Log.info { "-" * 80 } if verbose
 
         failures = verify_dataset(dataset_id, dataset_name, metadata, verbose, strict)
 
         total_signatures += failures[:signature_count]
         failed_verifications += failures[:failures]
 
-        Log.info {""} unless verbose
+        Log.info { "" } unless verbose
       end
 
       VerificationSummary.new(
@@ -112,14 +112,14 @@ module Command
       dataset_name : String,
       metadata : String,
       verbose : Bool,
-      strict : Bool
+      strict : Bool,
     )
       result = {signature_count: 0, failures: 0}.to_h
 
       # Parse metadata
       metadata_json = UPD::SignatureValidator.parse_metadata(metadata)
       unless metadata_json
-        Log.info {"  ✗ Invalid JSON metadata"}
+        Log.info { "  ✗ Invalid JSON metadata" }
         result[:failures] += 1
         return result
       end
@@ -128,11 +128,11 @@ module Command
       content_signatures = UPD::SignatureValidator.extract_signatures(metadata_json)
 
       if content_signatures.empty?
-        Log.info {"  - No signatures found"}
+        Log.info { "  - No signatures found" }
         return result
       end
 
-      Log.info {"  Found #{content_signatures.size} signature(s)"} if verbose
+      Log.info { "  Found #{content_signatures.size} signature(s)" } if verbose
 
       # Verify each signature
       content_signatures.each_with_index do |sig, idx|
@@ -159,61 +159,58 @@ module Command
       sig : JSON::Any,
       sig_num : String,
       verbose : Bool,
-      strict : Bool
+      strict : Bool,
     ) : Bool
-      begin
-        # Extract signature data using validator
-        sig_data = UPD::SignatureValidator.extract_signature_data(sig)
+      # Extract signature data using validator
+      sig_data = UPD::SignatureValidator.extract_signature_data(sig)
 
-        if verbose
-          print_signature_info(sig_data, sig_num)
-        end
+      if verbose
+        print_signature_info(sig_data, sig_num)
+      end
 
-        # Use the validator to verify the signature
-        verification_result = UPD::SignatureValidator.verify_signature(
-          root.database,
-          dataset_id,
-          sig_data,
-          strict
-        )
+      # Use the validator to verify the signature
+      verification_result = UPD::SignatureValidator.verify_signature(
+        root.database,
+        dataset_id,
+        sig_data,
+        strict
+      )
 
-        if verification_result.success
-          Log.info {"  ✓ Signature#{sig_num} valid"}
-          true
-        else
-          Log.info {"  ✗ Signature#{sig_num} INVALID: #{verification_result.message}"}
-          false
-        end
-
-      rescue e
-        Log.info {"  ✗ Signature#{sig_num} INVALID: #{e.message}"}
+      if verification_result.success
+        Log.info { "  ✓ Signature#{sig_num} valid" }
+        true
+      else
+        Log.info { "  ✗ Signature#{sig_num} INVALID: #{verification_result.message}" }
         false
       end
+    rescue e
+      Log.info { "  ✗ Signature#{sig_num} INVALID: #{e.message}" }
+      false
     end
 
     # Print signature information (verbose mode)
     protected def print_signature_info(sig_data : UPD::SignatureValidator::SignatureData, sig_num : String)
-      Log.info {"  Signature#{sig_num}:"}
-      Log.info {"    Signed at: #{sig_data.signed_at}"}
-      Log.info {"    Algorithm: #{sig_data.algorithm}"}
-      Log.info {"    Curve: #{sig_data.curve}"}
-      Log.info {"    Flavor tables: #{sig_data.signed_flavor_tables.join(", ")}"} if !sig_data.signed_flavor_tables.empty?
+      Log.info { "  Signature#{sig_num}:" }
+      Log.info { "    Signed at: #{sig_data.signed_at}" }
+      Log.info { "    Algorithm: #{sig_data.algorithm}" }
+      Log.info { "    Curve: #{sig_data.curve}" }
+      Log.info { "    Flavor tables: #{sig_data.signed_flavor_tables.join(", ")}" } if !sig_data.signed_flavor_tables.empty?
     end
 
     # Print verification summary
     protected def print_summary(summary : VerificationSummary)
-      Log.info {"=" * 80}
-      Log.info {"Verification Summary:"}
-      Log.info {"  Datasets verified: #{summary.total_datasets}"}
-      Log.info {"  Total signatures: #{summary.total_signatures}"}
-      Log.info {"  Failed verifications: #{summary.failed_verifications}"}
+      Log.info { "=" * 80 }
+      Log.info { "Verification Summary:" }
+      Log.info { "  Datasets verified: #{summary.total_datasets}" }
+      Log.info { "  Total signatures: #{summary.total_signatures}" }
+      Log.info { "  Failed verifications: #{summary.failed_verifications}" }
 
       if summary.failed_verifications > 0
-        Log.info {""}
+        Log.info { "" }
         raise Command::UpdError.new("⚠️  Some signatures failed verification!", self)
       else
-        Log.info {""}
-        Log.info {"✓ All signatures valid"}
+        Log.info { "" }
+        Log.info { "✓ All signatures valid" }
       end
     end
   end

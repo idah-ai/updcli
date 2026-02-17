@@ -27,7 +27,7 @@ module Command
 
     property! database : DB::Connection
 
-    def with_db
+    def with_db(&)
       db_file = option("input")
 
       DB.connect "duckdb://#{db_file}" do |database|
@@ -36,8 +36,8 @@ module Command
     end
 
     def run
-      with_db do |db|
-        @database = db
+      with_db do |database|
+        @database = database
         super
       end
     end

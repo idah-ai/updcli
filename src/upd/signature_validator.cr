@@ -41,24 +41,20 @@ module UPD
 
     # Parse metadata JSON
     def self.parse_metadata(metadata : String) : Hash(String, JSON::Any)?
-      begin
-        JSON.parse(metadata).as_h
-      rescue
-        nil
-      end
+      JSON.parse(metadata).as_h
+    rescue
+      nil
     end
 
     # Extract signatures from metadata
     def self.extract_signatures(metadata_json : Hash(String, JSON::Any)) : Array(JSON::Any)
-      begin
-        if sig = metadata_json["Content-Signature"]?
-          sig.as_a
-        else
-          [] of JSON::Any
-        end
-      rescue
+      if sig = metadata_json["Content-Signature"]?
+        sig.as_a
+      else
         [] of JSON::Any
       end
+    rescue
+      [] of JSON::Any
     end
 
     # Extract signature data from JSON
@@ -116,7 +112,7 @@ module UPD
       dataset_id : String,
       tables_to_serialize : Array(String),
       algorithm : String,
-      expected_hash : String
+      expected_hash : String,
     ) : String
       computed_hash = UPD::Serialization.compute_data_hash(
         database,
@@ -138,7 +134,7 @@ module UPD
       database : DB::Connection,
       tables_to_serialize : Array(String),
       algorithm : String,
-      expected_hash : String
+      expected_hash : String,
     ) : String
       computed_hash = UPD::Serialization.compute_schema_hash(
         database,
@@ -160,7 +156,7 @@ module UPD
     def self.verify_ecdsa_signature(
       ec_key : OpenSSL::PKey::EC,
       data_hash : String,
-      signature : Bytes
+      signature : Bytes,
     )
       unless ec_key.ec_verify(data_hash.hexbytes, signature)
         raise "ECDSA signature verification failed"
@@ -172,55 +168,52 @@ module UPD
       database : DB::Connection,
       dataset_id : String,
       sig_data : SignatureData,
-      strict : Bool = false
+      strict : Bool = false,
     ) : VerificationResult
-      begin
-        # Validate algorithm and curve
-        validate_algorithm(sig_data.algorithm)
-        validate_curve(sig_data.curve)
+      # Validate algorithm and curve
+      validate_algorithm(sig_data.algorithm)
+      validate_curve(sig_data.curve)
 
-        # Parse certificate and extract key
-        signature = Base64.decode(sig_data.signature_b64)
-        certificate = parse_certificate(sig_data.certificate_b64)
-        ec_key = extract_ec_key(certificate)
+      # Parse certificate and extract key
+      signature = Base64.decode(sig_data.signature_b64)
+      certificate = parse_certificate(sig_data.certificate_b64)
+      ec_key = extract_ec_key(certificate)
 
-        # Verify hashes
-        tables_to_serialize = UPD::Serialization::CORE_TABLES_ORDER + sig_data.signed_flavor_tables
+      # Verify hashes
+      tables_to_serialize = UPD::Serialization::CORE_TABLES_ORDER + sig_data.signed_flavor_tables
 
-        verify_data_hash(
-          database,
-          dataset_id,
-          tables_to_serialize,
-          sig_data.algorithm,
-          sig_data.expected_data_hash
-        )
+      verify_data_hash(
+        database,
+        dataset_id,
+        tables_to_serialize,
+        sig_data.algorithm,
+        sig_data.expected_data_hash
+      )
 
-        verify_schema_hash(
-          database,
-          tables_to_serialize,
-          sig_data.algorithm,
-          sig_data.expected_schema_hash
-        )
+      verify_schema_hash(
+        database,
+        tables_to_serialize,
+        sig_data.algorithm,
+        sig_data.expected_schema_hash
+      )
 
-        # Verify ECDSA signature
-        verify_ecdsa_signature(ec_key, sig_data.expected_data_hash, signature)
+      # Verify ECDSA signature
+      verify_ecdsa_signature(ec_key, sig_data.expected_data_hash, signature)
 
-        # Optional: verify certificate validity
-        if strict
-          verify_certificate_validity(certificate)
-        end
-
-        VerificationResult.new(
-          success: true,
-          message: "Signature valid"
-        )
-
-      rescue e
-        VerificationResult.new(
-          success: false,
-          message: e.message || "Unknown error"
-        )
+      # Optional: verify certificate validity
+      if strict
+        verify_certificate_validity(certificate)
       end
+
+      VerificationResult.new(
+        success: true,
+        message: "Signature valid"
+      )
+    rescue e
+      VerificationResult.new(
+        success: false,
+        message: e.message || "Unknown error"
+      )
     end
   end
 end

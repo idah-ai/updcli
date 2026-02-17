@@ -12,15 +12,15 @@ module Command
           option("id")
         ) do |media|
           {
-            id: media.read(String),
-            media_type: media.read(String)
+            id:         media.read(String),
+            media_type: media.read(String),
           }
         end
         if medias.empty?
-          Log.warn {"No Medias found."}
+          Log.warn { "No Medias found." }
         else
           medias.each do |media|
-            Log.info {media.to_json}
+            Log.info { media.to_json }
           end
         end
       end

@@ -6,15 +6,16 @@ module Command
       description "Show a dataset"
 
       option "id", "i", "id", required: true, type: :string
+
       def run_impl
         datasets = root.database.query_all(
           "SELECT id, name, modality FROM datasets WHERE id = ?",
           option("id")
         ) do |dataset|
           {
-            id: dataset.read(String),
-            name: dataset.read(String),
-            modality: dataset.read(String)
+            id:       dataset.read(String),
+            name:     dataset.read(String),
+            modality: dataset.read(String),
           }
         end
         if datasets.empty?

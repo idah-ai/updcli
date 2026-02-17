@@ -13,18 +13,18 @@ module Command
         result = root.database.exec(
           "INSERT into entries values (?, ?, ?, ?)", # ?,...
           args: [
-            option("id") || UUID.v7.to_s,
-            option("dataset_id"),
-            option("url"),
-            option("metadata") || {
-              "Created-At": Time.local.to_s("%Y-%m-%d %H:%M:%S%:z"),
-              "Updated-At": nil,
-              "Created-by": "updcli"
-            }.to_json
-          ]
+          option("id") || UUID.v7.to_s,
+          option("dataset_id"),
+          option("url"),
+          option("metadata") || {
+            "Created-At": Time.local.to_s("%Y-%m-%d %H:%M:%S%:z"),
+            "Updated-At": nil,
+            "Created-by": "updcli",
+          }.to_json,
+        ]
         )
 
-        Log.info {result}
+        Log.info { result }
       end
     end
   end

@@ -1,4 +1,5 @@
 require "json"
+
 module Command
   module Media
     class List < Base
@@ -9,15 +10,15 @@ module Command
       def run_impl
         medias = root.database.query_all("SELECT id, media_type FROM medias") do |media|
           {
-            id: media.read(String),
-            media_type: media.read(String)
+            id:         media.read(String),
+            media_type: media.read(String),
           }
         end
         if medias.empty?
-          Log.info {"No Medias found."}
+          Log.info { "No Medias found." }
         else
           medias.each do |media|
-            Log.info {media.to_json}
+            Log.info { media.to_json }
           end
         end
       end

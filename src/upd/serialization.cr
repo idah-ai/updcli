@@ -45,20 +45,20 @@ module UPD
     # Read a column value and convert to canonical string representation
     def self.read_column(column, row)
       value = case column[:type]
-      when "VARCHAR", "BLOB", "UUID"
-        row.read(String?)
-      when "BOOLEAN"
-        bool_val = row.read(String?)
-        bool_val ? (bool_val =~ /^t|true$/i ? "true" : "false") : nil
-      when "TINYINT", "SMALLINT", "INTEGER", "BIGINT", "HUGEINT",
-           "UTINYINT", "USMALLINT", "UINTEGER", "UBIGINT",
-           "FLOAT", "DOUBLE", "DECIMAL",
-           "TIMESTAMP", "TIMESTAMPTZ", "DATE", "TIME", "TIMETZ"
-        # Already cast to VARCHAR in the query
-        row.read(String?)
-      else
-        raise "Unsupported column type: #{column[:name]} (#{column[:type]})"
-      end
+              when "VARCHAR", "BLOB", "UUID"
+                row.read(String?)
+              when "BOOLEAN"
+                bool_val = row.read(String?)
+                bool_val ? (bool_val =~ /^t|true$/i ? "true" : "false") : nil
+              when "TINYINT", "SMALLINT", "INTEGER", "BIGINT", "HUGEINT",
+                   "UTINYINT", "USMALLINT", "UINTEGER", "UBIGINT",
+                   "FLOAT", "DOUBLE", "DECIMAL",
+                   "TIMESTAMP", "TIMESTAMPTZ", "DATE", "TIME", "TIMETZ"
+                # Already cast to VARCHAR in the query
+                row.read(String?)
+              else
+                raise "Unsupported column type: #{column[:name]} (#{column[:type]})"
+              end
 
       # RFC 5.4.4: NULL values must be represented as \x00NULL\x00
       value || "\x00NULL\x00"
@@ -83,7 +83,7 @@ module UPD
       ) do |row|
         {
           name: row.read(String),
-          type: row.read(String).upcase
+          type: row.read(String).upcase,
         }
       end
     end
@@ -136,13 +136,13 @@ module UPD
       # Serialize each table (columns are fetched from information_schema inside serialize_table)
       # Hash the serialized data using specified algorithm
       digest = case algorithm
-      when "SHA256"
-        Digest::SHA256.new
-      when "SHA512"
-        Digest::SHA512.new
-      else
-        raise "Unsupported hash algorithm: #{algorithm}. Supported: SHA256, SHA512"
-      end
+               when "SHA256"
+                 Digest::SHA256.new
+               when "SHA512"
+                 Digest::SHA512.new
+               else
+                 raise "Unsupported hash algorithm: #{algorithm}. Supported: SHA256, SHA512"
+               end
 
       tables_serialization = tables_to_serialize.map do |table_name|
         serialize_table(database, table_name, dataset_id)
@@ -160,27 +160,27 @@ module UPD
       tables.each { |table_name| validate_table_name(table_name) }
 
       # Get CREATE TABLE statements for all tables
-      sql_create_stmts = tables.map do |table_name|
+      sql_create_stmts = tables.compact_map do |table_name|
         # table_name is validated above, safe to use in query
         database.query_one(
           "SELECT sql FROM duckdb_tables WHERE table_name = ?",
           table_name
-        ) { |r| r.read(String) }
-      end.compact
+        ) { |result| result.read(String) }
+      end
 
       # Normalize, sort alphabetically by table name, and concatenate
-      normalized_stmts = sql_create_stmts.map { |stmt| normalize_sql(stmt) }.sort
+      normalized_stmts = sql_create_stmts.map { |stmt| normalize_sql(stmt) }.sort!
       schema = normalized_stmts.join("\n")
 
       # Hash the schema using specified algorithm
       digest = case algorithm
-      when "SHA256"
-        Digest::SHA256.new
-      when "SHA512"
-        Digest::SHA512.new
-      else
-        raise "Unsupported hash algorithm: #{algorithm}. Supported: SHA256, SHA512"
-      end
+               when "SHA256"
+                 Digest::SHA256.new
+               when "SHA512"
+                 Digest::SHA512.new
+               else
+                 raise "Unsupported hash algorithm: #{algorithm}. Supported: SHA256, SHA512"
+               end
 
       digest.update(schema)
       digest.hexfinal

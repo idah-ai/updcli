@@ -6,5 +6,7 @@ module Command
       super(message)
     end
   end
-  class UpdError < Error end
+
+  class UpdError < Error
+  end
 end

@@ -3,7 +3,7 @@ require "uuid"
 module Command
   module Dataset
     class Delete < Base
-      Log = ::Log.for("dataset:update")
+      Log = ::Log.for("dataset.update")
 
       description "delete"
 

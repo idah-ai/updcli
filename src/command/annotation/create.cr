@@ -1,7 +1,7 @@
 module Command
   module Annotation
     class Create < Base
-      Log = ::Log.for("annotation:create")
+      Log = ::Log.for("annotation.create")
 
       description "Create an entry"
       option "id", "i", "id", required: false, type: :string

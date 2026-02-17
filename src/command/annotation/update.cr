@@ -1,6 +1,8 @@
 module Command
   module Annotation
     class Update < Base
+      Log = ::Log.for("annotation.update")
+
       description "Update an annotation"
 
       option "id", "i", "Annotation ID", required: true, type: :string
@@ -58,7 +60,7 @@ module Command
         metadata["Updated-At"] = JSON::Any.new(Time.local.to_s("%Y-%m-%d %H:%M:%S%:z"))
         metadata["Updated-By"] = JSON::Any.new("updcli")
 
-        puts root.database.exec(
+        result = root.database.exec(
           "UPDATE annotations SET shape_type = ?, shape_args = ?, annotation = ?, metadata = ? WHERE id = ?",
           args: [
             option("type") || current_type,
@@ -68,6 +70,8 @@ module Command
             option("id")
           ]
         )
+
+        Log.info { result }
       end
     end
   end

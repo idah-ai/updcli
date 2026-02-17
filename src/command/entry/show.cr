@@ -1,7 +1,7 @@
 module Command
   module Entry
     class Show < Base
-      Log = ::Log.for("entry:show")
+      Log = ::Log.for("entry.show")
 
       description "Show an entry"
       option "id", "i", "id", required: true, type: :string

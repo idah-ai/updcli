@@ -1,7 +1,7 @@
 module Command
   module Dataset
     class List < Base
-      Log = ::Log.for("dataset:list")
+      Log = ::Log.for("dataset.list")
 
       description "List the datasets"
 

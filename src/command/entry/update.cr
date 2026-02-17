@@ -1,6 +1,8 @@
 module Command
   module Entry
     class Update < Base
+      ::Log.for("entry.update")
+
       description "Update an entry"
 
       option "id", "i", "Entry ID", required: true, type: :string
@@ -36,7 +38,7 @@ module Command
         metadata["Updated-At"] = JSON::Any.new(Time.local.to_s("%Y-%m-%d %H:%M:%S%:z"))
         metadata["Updated-By"] = JSON::Any.new("updcli")
 
-        puts root.database.exec(
+        result = root.database.exec(
           "UPDATE entries SET media_url = ?, metadata = ? WHERE id = ?",
           args: [
             option("url") || current_url,
@@ -44,6 +46,8 @@ module Command
             option("id")
           ]
         )
+
+        Log.info { result }
       end
     end
   end

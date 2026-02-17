@@ -1,7 +1,7 @@
 module Command
   module Metadata
     class Show < Base
-      Log = ::Log.for("metadata:show")
+      Log = ::Log.for("metadata.show")
       description "Show Metadata"
 
       def run_impl

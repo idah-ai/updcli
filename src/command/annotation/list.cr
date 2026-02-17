@@ -1,7 +1,7 @@
 module Command
   module Annotation
     class List < Base
-      Log = ::Log.for("annotation:list")
+      Log = ::Log.for("annotation.list")
       description "List the annotations"
 
       def run_impl

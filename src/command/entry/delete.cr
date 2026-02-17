@@ -3,7 +3,7 @@ require "uuid"
 module Command
   module Entry
     class Delete < Base
-      Log = ::Log.for("entry:delete")
+      Log = ::Log.for("entry.delete")
 
       description "delete"
 

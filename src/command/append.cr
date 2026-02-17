@@ -45,7 +45,6 @@ module Command
           end
           root.database.exec("COMMIT")
         rescue e
-          puts e
           root.database.exec("ROLLBACK")
           raise e
         end

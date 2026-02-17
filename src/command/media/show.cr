@@ -1,7 +1,7 @@
 module Command
   module Media
     class Show < Base
-      Log = ::Log.for("media:show")
+      Log = ::Log.for("media.show")
 
       description "Show a Media"
       option "id", "i", "id", required: true, type: :string

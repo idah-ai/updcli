@@ -1,5 +1,6 @@
 module Command
   class Merge < Base
+    Log = ::Log.for("merge")
     description "Merge another UPD file into this one."
 
     option "source", "s", "Path to the source UPD file to merge from", required: true, type: :string
@@ -45,11 +46,11 @@ module Command
 
         db.exec("COMMIT")
 
-        puts "Merge complete (strategy: #{strategy}):"
-        puts "  datasets:    #{datasets_merged}"
-        puts "  entries:     #{entries_merged}"
-        puts "  annotations: #{annotations_merged}"
-        puts "  medias:      #{medias_merged}"
+        Log.info { "Merge complete (strategy: #{strategy}):" }
+        Log.info { "  datasets:    #{datasets_merged}" }
+        Log.info { "  entries:     #{entries_merged}" }
+        Log.info { "  annotations: #{annotations_merged}" }
+        Log.info { "  medias:      #{medias_merged}" }
       rescue e
         db.exec("ROLLBACK") rescue nil
         raise Command::UpdError.new("Merge failed and was rolled back: #{e.message}", self)

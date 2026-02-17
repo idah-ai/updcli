@@ -4,7 +4,7 @@ module Command
   module Media
     class Extract < Base
       # add option to show/list in place ?
-      Log = ::Log.for("media:extract")
+      Log = ::Log.for("media.extract")
       description "extract"
 
       option "id", "i", "id", required: true, type: :string

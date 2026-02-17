@@ -1,7 +1,7 @@
 module Command
   module Dataset
     class Show < Base
-      Log = ::Log.for("dataset:show")
+      Log = ::Log.for("dataset.show")
 
       description "Show a dataset"
 

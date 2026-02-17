@@ -3,7 +3,7 @@ require "json"
 module Command
   module Media
     class List < Base
-      Log = ::Log.for("media:list")
+      Log = ::Log.for("media.list")
 
       description "List the Medias"
 

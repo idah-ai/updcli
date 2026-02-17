@@ -1,7 +1,7 @@
 module Command
   module Entry
     class Create < Base
-      Log = ::Log.for("entry:create")
+      Log = ::Log.for("entry.create")
 
       description "Create an entry"
       option "id", "i", "id", required: false, type: :string

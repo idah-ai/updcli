@@ -3,7 +3,7 @@ require "uuid"
 module Command
   module Annotation
     class Delete < Base
-      Log = ::Log.for("annotation:delete")
+      Log = ::Log.for("annotation.delete")
       description "delete"
 
       option "id", "i", "id", required: false, type: :string

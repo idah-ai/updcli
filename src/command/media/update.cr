@@ -3,6 +3,8 @@ require "mime"
 module Command
   module Media
     class Update < Base
+      ::Log.for("media.update")
+
       description "Update a media"
 
       option "id", "i", "Media ID", required: true, type: :string
@@ -51,7 +53,7 @@ module Command
         metadata["Updated-At"] = JSON::Any.new(Time.local.to_s("%Y-%m-%d %H:%M:%S%:z"))
         metadata["Updated-By"] = JSON::Any.new("updcli")
 
-        puts root.database.exec(
+        result = root.database.exec(
           "UPDATE medias SET blob_data = ?, media_type = ?, metadata = ? WHERE id = ? AND key = ?",
           args: [
             new_blob,
@@ -61,6 +63,8 @@ module Command
             option("key")
           ]
         )
+
+        Log.info { result }
       end
     end
   end

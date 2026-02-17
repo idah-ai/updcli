@@ -3,7 +3,7 @@ require "uuid"
 module Command
   module Media
     class Delete < Base
-      Log = ::Log.for("media:delete")
+      Log = ::Log.for("media.delete")
       description "delete"
 
       option "id", "i", "id", required: false, type: :string

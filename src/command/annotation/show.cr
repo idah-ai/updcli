@@ -1,7 +1,7 @@
 module Command
   module Annotation
     class Show < Base
-      Log = ::Log.for("annotation:show")
+      Log = ::Log.for("annotation.show")
 
       description "Show an annotation"
 

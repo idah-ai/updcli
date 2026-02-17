@@ -3,7 +3,7 @@ require "uuid"
 module Command
   module Dataset
     class Update < Base
-      Log = ::Log.for("dataset:update")
+      Log = ::Log.for("dataset.update")
 
       description "Update dataset"
 

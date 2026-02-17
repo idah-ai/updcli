@@ -3,7 +3,7 @@ require "mime"
 module Command
   module Media
     class Create < Base
-      Log = ::Log.for("media:create")
+      Log = ::Log.for("media.create")
 
       description "create"
 

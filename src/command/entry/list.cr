@@ -1,7 +1,7 @@
 module Command
   module Entry
     class List < Base
-      Log = ::Log.for("entry:list")
+      Log = ::Log.for("entry.list")
 
       description "List the entries"
 

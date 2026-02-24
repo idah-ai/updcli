@@ -1,5 +1,9 @@
 version: 2.0
 shards:
+  ameba:
+    git: https://github.com/crystal-ameba/ameba.git
+    version: 1.6.4
+
   db:
     git: https://github.com/crystal-lang/crystal-db.git
     version: 0.13.1
@@ -7,4 +11,8 @@ shards:
   duckdb:
     git: https://github.com/amauryt/crystal-duckdb.git
     version: 0.2.5
+
+  openssl_ext:
+    git: https://github.com/spider-gazelle/openssl_ext.git
+    version: 2.8.3
 

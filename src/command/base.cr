@@ -45,7 +45,7 @@ module Command
 
     # Access the root command.
     def root(t : T.class = Command::Root) forall T
-      if (root = @root)
+      if root = @root
         root.root(t)
       else
         if self.is_a?(T)
@@ -72,10 +72,10 @@ module Command
 
     def print_help
       parts = ["Usage:", @name]
-      parts << "[options]" if self.class.self_options.any?
-      parts << "[subcommand]" if self.class.self_sub_commands.any?
-      self.class.self_positionals.each do |p|
-        parts << (p[:required] ? "<#{p[:name]}>" : "[#{p[:name]}]")
+      parts << "[options]" if !self.class.self_options.empty?
+      parts << "[subcommand]" if !self.class.self_sub_commands.empty?
+      self.class.self_positionals.each do |pos|
+        parts << (pos[:required] ? "<#{pos[:name]}>" : "[#{pos[:name]}]")
       end
       puts parts.join(" ")
 
@@ -84,7 +84,7 @@ module Command
         puts desc
       end
 
-      if self.class.self_options.any?
+      if !self.class.self_options.empty?
         puts
         puts "Options:"
         self.class.self_options.each do |long, opt_def|
@@ -102,7 +102,7 @@ module Command
         end
       end
 
-      if self.class.self_positionals.any?
+      if !self.class.self_positionals.empty?
         puts
         puts "Arguments:"
         self.class.self_positionals.each do |pos_def|
@@ -110,7 +110,7 @@ module Command
         end
       end
 
-      if self.class.self_sub_commands.any?
+      if !self.class.self_sub_commands.empty?
         puts
         puts "Subcommands:"
         self.class.self_sub_commands.keys.each do |name|
@@ -177,7 +177,7 @@ module Command
       @positionals = remaining_args.select(&.type.==(:pos)).map(&.name)
 
       unexpected_opts = remaining_args.reject(&.type.==(:pos))
-      if unexpected_opts.any?
+      if !unexpected_opts.empty?
         raise Error.new("Unexpected arguments for command '#{@name}': #{unexpected_opts.map(&.name).join(" ")}", self)
       end
 
@@ -193,6 +193,18 @@ module Command
           raise Error.new("Missing required positional argument for command '#{@name}': #{pos_def[:name]}", self)
         end
       end
+    end
+
+    def self.get_command(cmd_array)
+      first, *rest = cmd_array
+      klass = self.self_sub_commands[first]
+      return unless klass
+
+      rest.empty? ? klass : klass.get_command(rest)
+    end
+
+    def self.for(args, root)
+      self.new(args, root, self.class.name) # todo aggregate command path ?
     end
 
     # Executes the command.

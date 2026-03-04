@@ -48,16 +48,18 @@ RUN mkdir -p extract && cd extract && \
     ls -lh libduckdb_merged.a
 
 # Stage 2: Build Crystal binary
-FROM crystallang/crystal:1.16.2-alpine AS builder
+FROM crystallang/crystal:1.19-alpine AS builder
 
 RUN apk add --no-cache \
     build-base \
-    zlib-static \
-    zlib-dev \
     musl-dev \
     linux-headers \
     libstdc++-dev \
-    libgcc
+    zlib-dev zlib-static \
+    gmp-dev gmp-static \
+    pcre2-dev pcre2-static \
+    gc-dev gc-static \
+    openssl-dev openssl-libs-static
 
 # Copy ONLY the merged library
 COPY --from=duckdb-builder /build/merged/extract/libduckdb_merged.a /usr/lib/libduckdb.a

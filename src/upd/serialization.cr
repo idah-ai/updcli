@@ -1,6 +1,8 @@
+require "digest"
 require "digest/sha256"
 require "digest/sha512"
 require "duckdb"
+require "io"
 require "json"
 
 module UPD
@@ -107,7 +109,7 @@ module UPD
 
     # Serialize a single table for a dataset
     # Returns the canonical byte stream per RFC Section 5.4
-    def self.serialize_table(database, table_name : String, dataset_id : String) : String
+    def self.serialize_table(database, table_name : String, dataset_id : String, io : IO) : Nil
       validate_table_name(table_name)
 
       # Get columns from information_schema (guarantees correct ordinal order)
@@ -119,11 +121,19 @@ module UPD
       # Build query - table_name is validated above, safe to interpolate
       query = "SELECT #{query_columns.join(", ")} FROM #{table_name} #{where_clause} ORDER BY id ASC"
 
-      database.query_all(query, args: where_params) do |row|
-        columns.map do |column|
-          read_column(column, row)
-        end.join("\x00COL\x00")
-      end.join("\x00ROW\x00")
+      first_row = true
+      database.query(query, args: where_params) do |rs|
+        rs.each do
+          io << "\x00ROW\x00" unless first_row
+
+          columns.each_with_index do |column, index|
+            io << "\x00COL\x00" unless index == 0
+            io << read_column(column, rs)
+          end
+
+          first_row = false
+        end
+      end
     end
 
     # Compute data hash for a dataset
@@ -144,11 +154,13 @@ module UPD
                  raise "Unsupported hash algorithm: #{algorithm}. Supported: SHA256, SHA512"
                end
 
-      tables_serialization = tables_to_serialize.map do |table_name|
-        serialize_table(database, table_name, dataset_id)
-      end.join("\x00TABLE\x00")
+      io_digest = IO::Digest.new(IO::Memory.new, digest, IO::Digest::DigestMode::Write)
 
-      digest.update(tables_serialization)
+      tables_to_serialize.each_with_index do |table_name, index|
+        io_digest << "\x00TABLE\x00" unless index == 0
+        serialize_table(database, table_name, dataset_id, io_digest)
+      end
+
       digest.hexfinal
     end
 

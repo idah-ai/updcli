@@ -318,7 +318,9 @@ describe UPD::Serialization do
         db.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'url1', '{}')")
         db.exec("INSERT INTO entries VALUES ('e-2', 'ds-1', 'url2', '{}')")
 
-        result = UPD::Serialization.serialize_table(db, "entries", "ds-1")
+        io = IO::Memory.new
+        UPD::Serialization.serialize_table(db, "entries", "ds-1", io)
+        result = io.to_s
 
         # Should contain row delimiter
         result.should contain("\x00ROW\x00")
@@ -337,7 +339,9 @@ describe UPD::Serialization do
         db.exec("INSERT INTO entries VALUES ('e-2', 'ds-1', 'url2', '{}')")
         db.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'url1', '{}')")
 
-        result1 = UPD::Serialization.serialize_table(db, "entries", "ds-1")
+        io1 = IO::Memory.new
+        UPD::Serialization.serialize_table(db, "entries", "ds-1", io1)
+        result1 = io1.to_s
 
         # The result should always be the same regardless of insertion order
         DB.connect("duckdb::memory:") do |db2|
@@ -345,7 +349,9 @@ describe UPD::Serialization do
           db2.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'url1', '{}')")
           db2.exec("INSERT INTO entries VALUES ('e-2', 'ds-1', 'url2', '{}')")
 
-          result2 = UPD::Serialization.serialize_table(db2, "entries", "ds-1")
+          io2 = IO::Memory.new
+          UPD::Serialization.serialize_table(db2, "entries", "ds-1", io2)
+          result2 = io2.to_s
 
           result1.should eq(result2)
 
@@ -389,7 +395,9 @@ describe UPD::Serialization do
         malicious_id = "ds-1' OR '1'='1"
 
         # Should return empty result (no match), not all rows
-        result = UPD::Serialization.serialize_table(db, "entries", malicious_id)
+        io = IO::Memory.new
+        UPD::Serialization.serialize_table(db, "entries", malicious_id, io)
+        result = io.to_s
 
         # Should be empty (no COL delimiter means no data)
         result.should_not contain("\x00COL\x00")
@@ -450,7 +458,9 @@ describe UPD::Serialization do
         # Insert row with NULL metadata
         db.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'url1', NULL)")
 
-        serialized = UPD::Serialization.serialize_table(db, "entries", "ds-1")
+        io = IO::Memory.new
+        UPD::Serialization.serialize_table(db, "entries", "ds-1", io)
+        serialized = io.to_s
 
         # Per RFC: NULL must be represented as \x00NULL\x00
         serialized.should contain("\x00NULL\x00")
@@ -472,7 +482,9 @@ describe UPD::Serialization do
         db.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'url1', '{}')")
         db.exec("INSERT INTO entries VALUES ('e-2', 'ds-1', 'url2', '{}')")
 
-        serialized = UPD::Serialization.serialize_table(db, "entries", "ds-1")
+        io = IO::Memory.new
+        UPD::Serialization.serialize_table(db, "entries", "ds-1", io)
+        serialized = io.to_s
 
         # Should always be sorted by ID: e-1, e-2, e-3
         rows = serialized.split("\x00ROW\x00")
@@ -503,7 +515,9 @@ describe UPD::Serialization do
         # Columns should be in CREATE TABLE order, not alphabetical
         columns.map { |c| c[:name] }.should eq(["third_col", "id", "second_col", "dataset_id", "first_col"])
 
-        serialized = UPD::Serialization.serialize_table(db, "test_table", "ds-1")
+        io = IO::Memory.new
+        UPD::Serialization.serialize_table(db, "test_table", "ds-1", io)
+        serialized = io.to_s
 
         # Should be in ordinal order: third_col, id, second_col, dataset_id, first_col
         serialized.should eq("c\x00COL\x00t-1\x00COL\x00b\x00COL\x00ds-1\x00COL\x00a")

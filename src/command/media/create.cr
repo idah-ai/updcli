@@ -29,7 +29,7 @@ module Command
           File.read(option("file") || "").to_slice,                       # ...
           option("mimetype") || begin
             MIME.from_filename(option("file") || "")
-          rescue
+          rescue KeyError
             "application/octet-stream"
           end,
           option("metadata") || {

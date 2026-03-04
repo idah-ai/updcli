@@ -29,7 +29,7 @@ module Command
           raise Command::UpdError.new("File not found: #{file_path}", self) unless File.exists?(file_path)
           {
             File.read(file_path).to_slice,
-            option("mimetype") || MIME.from_filename(file_path)
+            option("mimetype") || MIME.from_filename(option("file") || "", "application/octet-stream")
           }
         else
           {current_blob, option("mimetype") || current_media_type}

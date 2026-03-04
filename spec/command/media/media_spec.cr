@@ -136,6 +136,23 @@ describe "Command::Media" do
       end
     end
 
+    it "set MIME type to application/octet-stream when auto-detection fails and no MIME type provided" do
+      with_temp_file("file.unknownext", "content") do |path|
+        Command::Root.new([
+          Command::Argument.new("input", :optlong, "test.upd"),
+          Command::Argument.new("media", :pos, nil),
+          Command::Argument.new("create", :pos, nil),
+          Command::Argument.new("file", :optlong, path),
+        ]).run
+
+        DB.open("duckdb://test.upd") do |db|
+          media_type = db.query_one("SELECT media_type FROM medias", as: String)
+          media_type.should eq("application/octet-stream")
+          db.close
+        end
+      end
+    end
+
     it "stores an empty key when none provided" do
       with_temp_file("photo.jpg", "fake jpeg content") do |path|
         Command::Root.new([
@@ -582,6 +599,32 @@ describe "Command::Media" do
             Command::Argument.new("key", :optlong, ""),
             Command::Argument.new("file", :optlong, new_path),
             Command::Argument.new("mimetype", :optlong, "application/octet-stream"),
+          ]).run
+
+          DB.open("duckdb://test.upd") do |db|
+            media_type = db.query_one("SELECT media_type FROM medias WHERE id = 'm-1'", as: String)
+            media_type.should eq("application/octet-stream")
+            db.close
+          end
+        end
+      end
+    end
+
+    it "set MIME type to application/octet-stream when auto-detection fails and no MIME type provided" do
+      with_temp_file("file.unknownext", "content") do |path|
+        DB.open("duckdb://test.upd") do |db|
+          db.exec("INSERT INTO medias VALUES ('m-1', '', ?, 'application/octet-stream', '{}')", File.read(path).to_slice)
+          db.close
+        end
+
+        with_temp_file("new.unknownext", "new content") do |new_path|
+          Command::Root.new([
+            Command::Argument.new("input", :optlong, "test.upd"),
+            Command::Argument.new("media", :pos, nil),
+            Command::Argument.new("update", :pos, nil),
+            Command::Argument.new("id", :optlong, "m-1"),
+            Command::Argument.new("key", :optlong, ""),
+            Command::Argument.new("file", :optlong, new_path),
           ]).run
 
           DB.open("duckdb://test.upd") do |db|

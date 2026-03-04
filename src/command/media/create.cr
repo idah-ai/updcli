@@ -27,7 +27,7 @@ module Command
           ].join,
           option("key") || "",
           File.read(option("file") || "").to_slice,                       # ...
-          option("mimetype") || MIME.from_filename(option("file") || ""), # ...
+          option("mimetype") || MIME.from_filename(option("file") || "", "application/octet-stream"),
           option("metadata") || {
             "Created-At": Time.local.to_s("%Y-%m-%d %H:%M:%S%:z"),
             "Updated-At": nil,

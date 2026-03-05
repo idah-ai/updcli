@@ -2,7 +2,6 @@ require "digest"
 require "digest/sha256"
 require "digest/sha512"
 require "duckdb"
-require "io"
 require "json"
 
 module UPD
@@ -109,7 +108,7 @@ module UPD
 
     # Serialize a single table for a dataset
     # Returns the canonical byte stream per RFC Section 5.4
-    def self.serialize_table(database, table_name : String, dataset_id : String, io : IO) : Nil
+    def self.serialize_table(database, table_name : String, dataset_id : String, digest : Digest) : Nil
       validate_table_name(table_name)
 
       # Get columns from information_schema (guarantees correct ordinal order)
@@ -123,15 +122,17 @@ module UPD
 
       first_row = true
       database.query(query, args: where_params) do |rs|
+        i = 0
         rs.each do
-          io << "\x00ROW\x00" unless first_row
+          digest << "\x00ROW\x00" unless first_row
 
           columns.each_with_index do |column, index|
-            io << "\x00COL\x00" unless index == 0
-            io << read_column(column, rs)
+            digest << "\x00COL\x00" unless index == 0
+            digest << read_column(column, rs)
           end
 
           first_row = false
+          i += 1
         end
       end
     end
@@ -154,11 +155,9 @@ module UPD
                  raise "Unsupported hash algorithm: #{algorithm}. Supported: SHA256, SHA512"
                end
 
-      io_digest = IO::Digest.new(IO::Memory.new, digest, IO::Digest::DigestMode::Write)
-
       tables_to_serialize.each_with_index do |table_name, index|
-        io_digest << "\x00TABLE\x00" unless index == 0
-        serialize_table(database, table_name, dataset_id, io_digest)
+        digest << "\x00TABLE\x00" unless index == 0
+        serialize_table(database, table_name, dataset_id, digest)
       end
 
       digest.hexfinal
@@ -194,7 +193,7 @@ module UPD
                  raise "Unsupported hash algorithm: #{algorithm}. Supported: SHA256, SHA512"
                end
 
-      digest.update(schema)
+      digest << schema
       digest.hexfinal
     end
   end

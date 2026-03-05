@@ -259,7 +259,7 @@ describe UPD::Serialization do
     end
 
     it "computes different schema hashes for different schemas" do
-      db =  DB.connect("duckdb::memory:") do |db|
+      DB.connect("duckdb::memory:") do |db|
         db.exec("CREATE TABLE entries (id VARCHAR PRIMARY KEY)")
         db.exec("CREATE TABLE annotations (id VARCHAR PRIMARY KEY)")
 
@@ -311,57 +311,6 @@ describe UPD::Serialization do
     end
   end
 
-  describe ".serialize_table" do
-    it "serializes table rows with correct delimiters" do
-      DB.connect("duckdb::memory:") do |db|
-        db.exec("CREATE TABLE entries (id VARCHAR PRIMARY KEY, dataset_id VARCHAR, media_url VARCHAR, metadata VARCHAR)")
-        db.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'url1', '{}')")
-        db.exec("INSERT INTO entries VALUES ('e-2', 'ds-1', 'url2', '{}')")
-
-        io = IO::Memory.new
-        UPD::Serialization.serialize_table(db, "entries", "ds-1", io)
-        result = io.to_s
-
-        # Should contain row delimiter
-        result.should contain("\x00ROW\x00")
-
-        # Should contain column delimiter
-        result.should contain("\x00COL\x00")
-
-        db.close
-      end
-    end
-
-    it "orders rows by id" do
-      DB.connect("duckdb::memory:") do |db|
-        db.exec("CREATE TABLE entries (id VARCHAR PRIMARY KEY, dataset_id VARCHAR, media_url VARCHAR, metadata VARCHAR)")
-        # Insert in reverse order
-        db.exec("INSERT INTO entries VALUES ('e-2', 'ds-1', 'url2', '{}')")
-        db.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'url1', '{}')")
-
-        io1 = IO::Memory.new
-        UPD::Serialization.serialize_table(db, "entries", "ds-1", io1)
-        result1 = io1.to_s
-
-        # The result should always be the same regardless of insertion order
-        DB.connect("duckdb::memory:") do |db2|
-          db2.exec("CREATE TABLE entries (id VARCHAR PRIMARY KEY, dataset_id VARCHAR, media_url VARCHAR, metadata VARCHAR)")
-          db2.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'url1', '{}')")
-          db2.exec("INSERT INTO entries VALUES ('e-2', 'ds-1', 'url2', '{}')")
-
-          io2 = IO::Memory.new
-          UPD::Serialization.serialize_table(db2, "entries", "ds-1", io2)
-          result2 = io2.to_s
-
-          result1.should eq(result2)
-
-          db.close
-          db2.close
-        end
-      end
-    end
-  end
-
   describe "SQL injection prevention" do
     it "validates table names and rejects SQL injection attempts" do
       expect_raises(Exception, /Invalid table name/) do
@@ -394,15 +343,61 @@ describe UPD::Serialization do
         # Attempt SQL injection in dataset_id
         malicious_id = "ds-1' OR '1'='1"
 
-        # Should return empty result (no match), not all rows
-        io = IO::Memory.new
-        UPD::Serialization.serialize_table(db, "entries", malicious_id, io)
-        result = io.to_s
+        # A malicious id matches no rows — the resulting digest must equal
+        # the digest of an empty serialization (nothing written to it).
+        digest = Digest::SHA256.new
+        UPD::Serialization.serialize_table(db, "entries", malicious_id, digest)
 
-        # Should be empty (no COL delimiter means no data)
-        result.should_not contain("\x00COL\x00")
+        digest.hexfinal.should eq(Digest::SHA256.hexdigest(""))
 
         db.close
+      end
+    end
+  end
+
+  describe ".serialize_table" do
+    it "serializes table rows with correct delimiters" do
+      DB.connect("duckdb::memory:") do |db|
+        db.exec("CREATE TABLE entries (id VARCHAR PRIMARY KEY, dataset_id VARCHAR, media_url VARCHAR, metadata VARCHAR)")
+        db.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'url1', '{}')")
+        db.exec("INSERT INTO entries VALUES ('e-2', 'ds-1', 'url2', '{}')")
+
+        # Expected canonical serialization:
+        # e-1<COL>ds-1<COL>url1<COL>{}<ROW>e-2<COL>ds-1<COL>url2<COL>{}
+        expected = "e-1\x00COL\x00ds-1\x00COL\x00url1\x00COL\x00{}\x00ROW\x00e-2\x00COL\x00ds-1\x00COL\x00url2\x00COL\x00{}"
+
+        digest = Digest::SHA256.new
+        UPD::Serialization.serialize_table(db, "entries", "ds-1", digest)
+
+        digest.hexfinal.should eq(Digest::SHA256.hexdigest(expected))
+
+        db.close
+      end
+    end
+
+    it "orders rows by id regardless of insertion order" do
+      # Insert in reverse order in db1, forward order in db2 — hashes must match.
+      DB.connect("duckdb::memory:") do |db1|
+        db1.exec("CREATE TABLE entries (id VARCHAR PRIMARY KEY, dataset_id VARCHAR, media_url VARCHAR, metadata VARCHAR)")
+        db1.exec("INSERT INTO entries VALUES ('e-2', 'ds-1', 'url2', '{}')")
+        db1.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'url1', '{}')")
+
+        DB.connect("duckdb::memory:") do |db2|
+          db2.exec("CREATE TABLE entries (id VARCHAR PRIMARY KEY, dataset_id VARCHAR, media_url VARCHAR, metadata VARCHAR)")
+          db2.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'url1', '{}')")
+          db2.exec("INSERT INTO entries VALUES ('e-2', 'ds-1', 'url2', '{}')")
+
+          d1 = Digest::SHA256.new
+          UPD::Serialization.serialize_table(db1, "entries", "ds-1", d1)
+
+          d2 = Digest::SHA256.new
+          UPD::Serialization.serialize_table(db2, "entries", "ds-1", d2)
+
+          d1.hexfinal.should eq(d2.hexfinal)
+
+          db1.close
+          db2.close
+        end
       end
     end
   end
@@ -439,9 +434,12 @@ describe UPD::Serialization do
         # Compute hash
         hash = UPD::Serialization.compute_data_hash(db, "ds-001", ["entries", "annotations"], "SHA256")
 
-        # Expected serialization per RFC:
-        # e-001\x00COL\x00ds-001\x00COL\x00https://example.com/img.jpg\x00COL\x00{"cby":"alice"}\x00ROW\x00e-002\x00COL\x00ds-001\x00COL\x00local:m-002\x00COL\x00{"cby":"bob"}\x00TABLE\x00a-001\x00COL\x00e-001\x00COL\x00box\x00COL\x00{"x":0}\x00COL\x00{"class":"cat"}\x00COL\x00{}
-
+        # Expected serialization per RFC 5.4.6:
+        # e-001<COL>ds-001<COL>https://example.com/img.jpg<COL>{"cby":"alice"}
+        # <ROW>
+        # e-002<COL>ds-001<COL>local:m-002<COL>{"cby":"bob"}
+        # <TABLE>
+        # a-001<COL>e-001<COL>box<COL>{"x":0}<COL>{"class":"cat"}<COL>{}
         expected_serialization = "e-001\x00COL\x00ds-001\x00COL\x00https://example.com/img.jpg\x00COL\x00{\"cby\":\"alice\"}\x00ROW\x00e-002\x00COL\x00ds-001\x00COL\x00local:m-002\x00COL\x00{\"cby\":\"bob\"}\x00TABLE\x00a-001\x00COL\x00e-001\x00COL\x00box\x00COL\x00{\"x\":0}\x00COL\x00{\"class\":\"cat\"}\x00COL\x00{}"
         expected_hash = Digest::SHA256.hexdigest(expected_serialization)
 
@@ -458,16 +456,14 @@ describe UPD::Serialization do
         # Insert row with NULL metadata
         db.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'url1', NULL)")
 
-        io = IO::Memory.new
-        UPD::Serialization.serialize_table(db, "entries", "ds-1", io)
-        serialized = io.to_s
-
         # Per RFC: NULL must be represented as \x00NULL\x00
-        serialized.should contain("\x00NULL\x00")
+        # Expected: e-1<COL>ds-1<COL>url1<COL><NULL>
+        expected = "e-1\x00COL\x00ds-1\x00COL\x00url1\x00COL\x00\x00NULL\x00"
 
-        # Verify exact serialization
-        # Expected: e-1\x00COL\x00ds-1\x00COL\x00url1\x00COL\x00\x00NULL\x00
-        serialized.should eq("e-1\x00COL\x00ds-1\x00COL\x00url1\x00COL\x00\x00NULL\x00")
+        digest = Digest::SHA256.new
+        UPD::Serialization.serialize_table(db, "entries", "ds-1", digest)
+
+        digest.hexfinal.should eq(Digest::SHA256.hexdigest(expected))
 
         db.close
       end
@@ -482,15 +478,13 @@ describe UPD::Serialization do
         db.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'url1', '{}')")
         db.exec("INSERT INTO entries VALUES ('e-2', 'ds-1', 'url2', '{}')")
 
-        io = IO::Memory.new
-        UPD::Serialization.serialize_table(db, "entries", "ds-1", io)
-        serialized = io.to_s
+        # Expected: rows sorted e-1, e-2, e-3
+        expected = "e-1\x00COL\x00ds-1\x00COL\x00url1\x00COL\x00{}\x00ROW\x00e-2\x00COL\x00ds-1\x00COL\x00url2\x00COL\x00{}\x00ROW\x00e-3\x00COL\x00ds-1\x00COL\x00url3\x00COL\x00{}"
 
-        # Should always be sorted by ID: e-1, e-2, e-3
-        rows = serialized.split("\x00ROW\x00")
-        rows[0].should start_with("e-1\x00COL\x00")
-        rows[1].should start_with("e-2\x00COL\x00")
-        rows[2].should start_with("e-3\x00COL\x00")
+        digest = Digest::SHA256.new
+        UPD::Serialization.serialize_table(db, "entries", "ds-1", digest)
+
+        digest.hexfinal.should eq(Digest::SHA256.hexdigest(expected))
 
         db.close
       end
@@ -515,12 +509,13 @@ describe UPD::Serialization do
         # Columns should be in CREATE TABLE order, not alphabetical
         columns.map { |c| c[:name] }.should eq(["third_col", "id", "second_col", "dataset_id", "first_col"])
 
-        io = IO::Memory.new
-        UPD::Serialization.serialize_table(db, "test_table", "ds-1", io)
-        serialized = io.to_s
+        # Expected: third_col<COL>id<COL>second_col<COL>dataset_id<COL>first_col
+        expected = "c\x00COL\x00t-1\x00COL\x00b\x00COL\x00ds-1\x00COL\x00a"
 
-        # Should be in ordinal order: third_col, id, second_col, dataset_id, first_col
-        serialized.should eq("c\x00COL\x00t-1\x00COL\x00b\x00COL\x00ds-1\x00COL\x00a")
+        digest = Digest::SHA256.new
+        UPD::Serialization.serialize_table(db, "test_table", "ds-1", digest)
+
+        digest.hexfinal.should eq(Digest::SHA256.hexdigest(expected))
 
         db.close
       end
@@ -553,18 +548,15 @@ describe UPD::Serialization do
 
         schema_hash = UPD::Serialization.compute_schema_hash(db, ["entries", "annotations"], "SHA256")
 
-        # Get normalized CREATE statements
-        entries_sql = db.query_one("SELECT sql FROM duckdb_tables WHERE table_name = 'entries'") { |r| r.read(String) }
+        entries_sql     = db.query_one("SELECT sql FROM duckdb_tables WHERE table_name = 'entries'") { |r| r.read(String) }
         annotations_sql = db.query_one("SELECT sql FROM duckdb_tables WHERE table_name = 'annotations'") { |r| r.read(String) }
 
-        # Normalize
-        entries_normalized = UPD::Serialization.normalize_sql(entries_sql)
+        entries_normalized     = UPD::Serialization.normalize_sql(entries_sql)
         annotations_normalized = UPD::Serialization.normalize_sql(annotations_sql)
 
-        # Sort alphabetically: annotations before entries
-        sorted_stmts = [annotations_normalized, entries_normalized].sort
+        sorted_stmts   = [annotations_normalized, entries_normalized].sort
         expected_schema = sorted_stmts.join("\n")
-        expected_hash = Digest::SHA256.hexdigest(expected_schema)
+        expected_hash   = Digest::SHA256.hexdigest(expected_schema)
 
         schema_hash.should eq(expected_hash)
 

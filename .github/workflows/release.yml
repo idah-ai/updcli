@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write
 
+env:
+  DUCKDB_VERSION: "v1.3.2"
+
 jobs:
   build:
     strategy:
@@ -86,7 +89,7 @@ jobs:
         if: matrix.os == 'macos-latest' && steps.cache-duckdb.outputs.cache-hit != 'true'
         run: |
           brew install cmake ninja
-          git clone --depth 1 --branch ${DUCKDB_VERSION} \
+          git clone --depth 1 --branch ${{ env.DUCKDB_VERSION }} \
             https://github.com/duckdb/duckdb.git
           cd duckdb
           cmake -G Ninja \

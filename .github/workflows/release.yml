@@ -83,7 +83,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: duckdb/build/release
-          key: duckdb-darwin-${{ matrix.arch }}-${{ github.ref_name }}
+          key: duckdb-darwin-${{ matrix.arch }}-${{ env.DUCKDB_VERSION }}
 
       - name: Build DuckDB static library (macOS)
         if: matrix.os == 'macos-latest' && steps.cache-duckdb.outputs.cache-hit != 'true'

@@ -81,8 +81,9 @@ COPY shard.yml ./
 COPY shard.lock ./
 COPY VERSION ./
 
-RUN crystal -v && shards install --production -v
+RUN crystal -v && shards install -v
 
+COPY spec ./spec
 COPY src ./src
 COPY sql ./sql
 COPY Makefile ./

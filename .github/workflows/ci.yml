@@ -37,7 +37,7 @@ jobs:
           cache-from: type=gha,scope=duckdb-builder
 
       - name: Run specs
-        run: docker run --rm updcli-builder crystal spec --verbose
+        run: docker run --rm updcli-builder make spec
 
       - name: Run Ameba
         continue-on-error: true # for now

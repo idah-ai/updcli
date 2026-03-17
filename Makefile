@@ -12,8 +12,9 @@ BASE_FLAGS := --release
 
 # Configure flags based on build type
 ifeq ($(STATIC),1)
-    FLAGS := $(BASE_FLAGS) --static --link-flags="-L/usr/lib -Wl,--start-group -lduckdb -lstdc++ -lm -lpthread -Wl,--end-group"
-    BUILD_TYPE := static
+		LINK_FLAGS := -L/usr/lib -lduckdb -lstdc++ -lm -lpthread
+		FLAGS := $(BASE_FLAGS) --static --link-flags="$(LINK_FLAGS)"
+		BUILD_TYPE := static
 else
     FLAGS := $(BASE_FLAGS)
     BUILD_TYPE := dynamic
@@ -96,3 +97,6 @@ clean:
 	rm -rf $(BUILD_DIR)
 
 .PHONY: all build run static dynamic info release clean
+
+spec:
+	crystal spec --verbose --link-flags="$(LINK_FLAGS)"

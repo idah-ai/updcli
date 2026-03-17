@@ -45,7 +45,7 @@ jobs:
       # Step 1: cache the heavy duckdb stage, shared with CI
       - name: Cache duckdb-builder stage
         if: matrix.os == 'ubuntu-latest'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           target: duckdb-builder
           push: false

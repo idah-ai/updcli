@@ -6,8 +6,6 @@ require "./command/**"
 
 Log.define_formatter LogFormat, "#{severity} | #{message}"
 
-VERSION = {{ read_file("#{__DIR__}/../VERSION").chomp }}
-
 Command::Parser.parse(ARGV).tap do |args|
   command = Command::Root.new(args)
   command.run

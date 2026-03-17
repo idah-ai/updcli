@@ -19,7 +19,7 @@ jobs:
 
       # Step 1: build and cache only the duckdb stage — no --load, cache export works
       - name: Cache duckdb-builder stage
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           target: duckdb-builder
           push: false

@@ -9,6 +9,8 @@ require "./sign"
 require "./verify"
 require "./merge"
 
+VERSION = {{ read_file("#{__DIR__}/../../VERSION").chomp }}
+
 module Command
   class Root < Base
     description "updcli: A command-line tool for managing Universal Portable Datasets (UPD)."

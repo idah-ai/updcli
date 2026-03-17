@@ -42,13 +42,23 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         uses: docker/setup-buildx-action@v3
 
+      # Step 1: cache the heavy duckdb stage, shared with CI
+      - name: Cache duckdb-builder stage
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          docker buildx build \
+            --target duckdb-builder \
+            --cache-from type=gha,scope=duckdb-builder \
+            --cache-to type=gha,mode=max,scope=duckdb-builder \
+            .
+
+      # Step 2: full build pulling duckdb layers from cache
       - name: Build (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
           docker buildx build \
             --platform ${{ matrix.platform }} \
             --cache-from type=gha,scope=duckdb-builder \
-            --cache-to type=gha,mode=max,scope=duckdb-builder \
             --output type=local,dest=./bin \
             -t updcli .
           mv ./bin/usr/local/bin/updcli ./bin/${{ matrix.binary }}

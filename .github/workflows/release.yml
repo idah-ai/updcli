@@ -47,6 +47,8 @@ jobs:
         run: |
           docker buildx build \
             --platform ${{ matrix.platform }} \
+            --cache-from type=gha,scope=duckdb-builder \
+            --cache-to type=gha,mode=max,scope=duckdb-builder \
             --output type=local,dest=./bin \
             -t updcli .
           mv ./bin/usr/local/bin/updcli ./bin/${{ matrix.binary }}

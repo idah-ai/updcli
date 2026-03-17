@@ -58,15 +58,17 @@ jobs:
       # Step 2: full build pulling duckdb layers from cache
       - name: Build (Linux)
         if: matrix.os == 'ubuntu-latest'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           platforms: ${{ matrix.platform }}
           outputs: type=local,dest=./bin
-          cache-from: type=gha,scope=duckdb-builder # reads only, no cache-to
+          cache-from: type=gha,scope=duckdb-builder
 
       - name: Move binary
         if: matrix.os == 'ubuntu-latest'
         run: |
+          echo "=== contents of ./bin ==="
+          find ./bin -type f
           mv ./bin/usr/local/bin/updcli ./bin/${{ matrix.binary }} || {
             echo "Binary not found at expected path. Contents of ./bin:"
             find ./bin -type f
@@ -132,12 +134,12 @@ jobs:
           shards install
           crystal build --release \
             --link-flags="-L$(pwd)/duckdb/build/release -lduckdb -lstdc++ -lm -lpthread" \
-            src/main.cr -o ${{ matrix.binary }}
+            src/main.cr -o bin/${{ matrix.binary }}
 
       # ---------- Common ----------
 
       - name: Package binary
-        run: tar czvf ${{ matrix.binary }}.tar.gz ${{ matrix.binary }}
+        run: tar czvf ${{ matrix.binary }}.tar.gz -C bin ${{ matrix.binary }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

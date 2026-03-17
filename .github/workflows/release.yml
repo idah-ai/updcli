@@ -42,7 +42,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         uses: docker/setup-buildx-action@v3
 
-      # Step 1: cache the heavy duckdb stage, shared with CI
+      # Step 1: cache the heavy duckdb stage
       - name: Cache duckdb-builder stage
         if: matrix.os == 'ubuntu-latest'
         uses: docker/build-push-action@v7
@@ -55,16 +55,21 @@ jobs:
       # Step 2: full build pulling duckdb layers from cache
       - name: Build (Linux)
         if: matrix.os == 'ubuntu-latest'
+        uses: docker/build-push-action@v6
+        with:
+          platforms: ${{ matrix.platform }}
+          outputs: type=local,dest=./bin
+          cache-from: type=gha,scope=duckdb-builder # reads only, no cache-to
+
+      - name: Move binary
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          docker buildx build \
-            --platform ${{ matrix.platform }} \
-            --cache-from type=gha,scope=duckdb-builder \
-            --output type=local,dest=./bin \
-            -t updcli .
-          mv ./bin/usr/local/bin/updcli ./bin/${{ matrix.binary }}
-
+          mv ./bin/usr/local/bin/updcli ./bin/${{ matrix.binary }} || {
+            echo "Binary not found at expected path. Contents of ./bin:"
+            find ./bin -type f
+            exit 1
+          }
       # ---------- macOS (native static build) ----------
-
       - name: Install Crystal (macOS)
         if: matrix.os == 'macos-latest'
         run: brew install crystal

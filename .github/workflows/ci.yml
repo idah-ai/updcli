@@ -17,24 +17,24 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Step 1: build and cache only the duckdb stage — no --load, cache export works
+      # Step 1: build and cache only the duckdb stage
       - name: Cache duckdb-builder stage
         uses: docker/build-push-action@v7
         with:
           target: duckdb-builder
           push: false
+          outputs: type=cacheonly
           cache-from: type=gha,scope=duckdb-builder
           cache-to: type=gha,mode=max,scope=duckdb-builder
 
       # Step 2: build the full builder stage, pulling duckdb layers from cache
       - name: Build builder image
-        run: |
-          docker buildx build \
-            --target builder \
-            --cache-from type=gha,scope=duckdb-builder \
-            --load \
-            -t updcli-builder \
-            .
+        uses: docker/build-push-action@v7
+        with:
+          target: builder
+          load: true
+          tags: updcli-builder
+          cache-from: type=gha,scope=duckdb-builder
 
       - name: Run specs
         run: docker run --rm updcli-builder crystal spec --verbose

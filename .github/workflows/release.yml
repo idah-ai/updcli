@@ -86,8 +86,6 @@ jobs:
         if: matrix.os == 'macos-latest' && steps.cache-duckdb.outputs.cache-hit != 'true'
         run: |
           brew install cmake ninja
-          # Read the same DuckDB version the Dockerfile uses
-          DUCKDB_VERSION=$(grep 'DUCKDB_VERSION' Dockerfile | head -1 | sed 's/.*ARG DUCKDB_VERSION=//')
           git clone --depth 1 --branch ${DUCKDB_VERSION} \
             https://github.com/duckdb/duckdb.git
           cd duckdb
@@ -104,6 +102,7 @@ jobs:
             -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} \
             -B build/release -S .
           cmake --build build/release --config Release
+          mv build/release/libduckdb_static.a build/release/libduckdb.a
 
       - name: Cache shards (macOS)
         if: matrix.os == 'macos-latest'

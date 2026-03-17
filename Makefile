@@ -11,8 +11,8 @@ STATIC ?= 0
 BASE_FLAGS := --release
 
 # Configure flags based on build type
+LINK_FLAGS := -L/usr/lib -lduckdb -lstdc++ -lm -lpthread
 ifeq ($(STATIC),1)
-		LINK_FLAGS := -L/usr/lib -lduckdb -lstdc++ -lm -lpthread
 		FLAGS := $(BASE_FLAGS) --static --link-flags="$(LINK_FLAGS)"
 		BUILD_TYPE := static
 else

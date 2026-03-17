@@ -2,6 +2,8 @@
 FROM alpine:3.19 AS duckdb-builder
 WORKDIR /build
 
+ARG DUCKDB_VERSION=v1.3.2
+
 RUN apk add --no-cache \
     g++ \
     git \
@@ -13,7 +15,7 @@ RUN apk add --no-cache \
     zlib-dev \
     zlib-static
 
-RUN git clone https://github.com/duckdb/duckdb && cd duckdb
+RUN git clone --depth 1 --branch ${DUCKDB_VERSION} https://github.com/duckdb/duckdb && cd duckdb
 
 WORKDIR /build/duckdb
 
@@ -74,6 +76,8 @@ WORKDIR /dsb
 
 COPY shard.yml ./
 COPY shard.lock ./
+COPY VERSION ./
+
 RUN crystal -v && shards install --production -v
 
 COPY src ./src
@@ -86,9 +90,9 @@ RUN echo "=== Merged library size ===" && ls -lh /usr/lib/libduckdb.a
 # Build
 RUN make static
 
-RUN file bin/datset && (ldd bin/datset 2>&1 || true)
+RUN file bin/updcli && (ldd bin/updcli 2>&1 || true)
 
 FROM alpine:3.19
 RUN apk add --no-cache libgcc libstdc++
-COPY --from=builder /dsb/bin/datset /usr/local/bin/datset
-ENTRYPOINT ["/usr/local/bin/datset"]
+COPY --from=builder /dsb/bin/updcli /usr/local/bin/updcli
+ENTRYPOINT ["/usr/local/bin/updcli"]

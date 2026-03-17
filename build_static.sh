@@ -1,16 +1,13 @@
 #!/bin/sh
 
-# Build the Docker image
-docker build -t dsb . &&
+# Ensure ./bin exists
+mkdir -p ./bin
 
-# Create a temporary container
-docker create --name dsbinstance dsb &&
+# Build and export the binary using docker buildx
+docker buildx build \
+  --build-arg DUCKDB_VERSION=v1.3.2 \
+  --output type=local,dest=./bin \
+  -t dsb .
 
-# Ensure ./bin existence
-mkdir -p ./bin &&
-
-# Extract the binary from the /output directory
-docker cp dsbinstance:/usr/local/bin/datset ./bin/datset-static &&
-
-# Clean up the container
-docker rm dsbinstance
+# Rename the binary (adjust the path as needed)
+cp ./bin/usr/local/bin/updcli ./bin/updcli-static

@@ -123,18 +123,18 @@ describe "Command::Entry" do
       end
     end
 
-    it "stores a local datset:// URL correctly" do
+    it "stores a local local:// URL correctly" do
       Command::Root.new([
         Command::Argument.new("input", :optlong, "test.upd"),
         Command::Argument.new("entry", :pos, nil),
         Command::Argument.new("create", :pos, nil),
         Command::Argument.new("dataset_id", :optlong, "ds-1"),
-        Command::Argument.new("url", :optlong, "datset://media-abc"),
+        Command::Argument.new("url", :optlong, "local://media-abc"),
       ]).run
 
       DB.open("duckdb://test.upd") do |db|
         url = db.query_one("SELECT media_url FROM entries", as: String)
-        url.should eq("datset://media-abc")
+        url.should eq("local://media-abc")
         db.close
       end
     end

@@ -1,7 +1,7 @@
--- datset v1.0
+-- updcli v1.0
 -- Schema definition.
 -- Use DuckDB
--- Indexes are optional in the format, but recommended for performant use with datset CLI.
+-- Indexes are optional in the format, but recommended for performant use with updcli.
 -- This schema is idempotent and can be used to create a new database or
 -- update an existing one.
 
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS medias (
 CREATE TABLE IF NOT EXISTS entries (
     id VARCHAR PRIMARY KEY CHECK(length(id) <= 64),
     dataset_id VARCHAR NOT NULL REFERENCES datasets(id) ON DELETE RESTRICT,
-    media_url VARCHAR NOT NULL,                                                -- Can be an external URL or datset://<media_identifier>
+    media_url VARCHAR NOT NULL,                                                -- Can be an external URL or local://<media_identifier>
     metadata VARCHAR DEFAULT '{}'                                              -- Metadata related to the entry, e.g., original filename, source, etc.
 );
 

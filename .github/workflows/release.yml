@@ -109,16 +109,14 @@ jobs:
           cmake --build build/release --config Release
 
           mkdir -p build/release/merged/extract
-          find build/release -name "*.a" -not -path "*/merged/*" | while read lib; do
+          find $(pwd)/build/release -name "*.a" -not -path "*/merged/*" | while read lib; do
+            [ -f "$lib" ] || { echo "Skipping missing: $lib"; continue; }
             libname=$(basename "$lib" .a)
             mkdir -p "build/release/merged/extract/${libname}"
-            cd "build/release/merged/extract/${libname}"
-            ar x "$lib"
-            cd -
+            (cd "build/release/merged/extract/${libname}" && ar x "$lib")
           done
-          find build/release/merged/extract -name "*.o" > build/release/merged/objects.txt
-          libtool -static -o build/release/libduckdb.a \
-            $(cat build/release/merged/objects.txt)
+          find build/release/merged/extract -name "*.o" > objects.txt
+          libtool -static -o build/release/libduckdb.a $(cat objects.txt)
 
       - name: Cache shards (macOS)
         if: matrix.os == 'macos-latest'

@@ -96,7 +96,7 @@ release:
 clean:
 	rm -rf $(BUILD_DIR)
 
-.PHONY: all build run static dynamic info release clean
+.PHONY: all build run static dynamic info release clean spec
 
 spec:
 	crystal spec --verbose --link-flags="$(LINK_FLAGS)"

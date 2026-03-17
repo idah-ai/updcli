@@ -105,6 +105,8 @@ jobs:
             -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} \
             -B build/release -S .
           cmake --build build/release --config Release
+          echo "=== produced libraries ==="
+          find build/release -name "*.a" -type f
           mv build/release/libduckdb_static.a build/release/libduckdb.a
 
       - name: Cache shards (macOS)

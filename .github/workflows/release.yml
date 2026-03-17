@@ -105,9 +105,18 @@ jobs:
             -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} \
             -B build/release -S .
           cmake --build build/release --config Release
-          echo "=== produced libraries ==="
-          find build/release -name "*.a" -type f
-          mv build/release/src/libduckdb_static.a build/release/libduckdb.a
+
+          mkdir -p build/release/merged/extract
+          find build/release -name "*.a" -not -path "*/merged/*" | while read lib; do
+            libname=$(basename "$lib" .a)
+            mkdir -p "build/release/merged/extract/${libname}"
+            cd "build/release/merged/extract/${libname}"
+            ar x "$lib"
+            cd -
+          done
+          find build/release/merged/extract -name "*.o" > build/release/merged/objects.txt
+          libtool -static -o build/release/libduckdb.a \
+            $(cat build/release/merged/objects.txt)
 
       - name: Cache shards (macOS)
         if: matrix.os == 'macos-latest'

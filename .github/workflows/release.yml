@@ -45,12 +45,12 @@ jobs:
       # Step 1: cache the heavy duckdb stage, shared with CI
       - name: Cache duckdb-builder stage
         if: matrix.os == 'ubuntu-latest'
-        run: |
-          docker buildx build \
-            --target duckdb-builder \
-            --cache-from type=gha,scope=duckdb-builder \
-            --cache-to type=gha,mode=max,scope=duckdb-builder \
-            .
+        uses: docker/build-push-action@v6
+        with:
+          target: duckdb-builder
+          push: false
+          cache-from: type=gha,scope=duckdb-builder
+          cache-to: type=gha,mode=max,scope=duckdb-builder
 
       # Step 2: full build pulling duckdb layers from cache
       - name: Build (Linux)

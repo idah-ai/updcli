@@ -175,4 +175,4 @@ jobs:
           gh release create latest \
             --title "latest (${{ github.ref_name }})" \
             --notes "Latest release — currently ${{ github.ref_name }}." \
-            artifacts/**/*.tar.gz
+            artifacts/*.tar.gz

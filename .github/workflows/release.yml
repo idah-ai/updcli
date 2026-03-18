@@ -42,12 +42,12 @@ jobs:
       # ---------- Linux (Docker static build) ----------
 
       - name: Set up Docker Buildx
-        if: matrix.os == 'ubuntu-latest'
+        if: startsWith(matrix.os, 'ubuntu')
         uses: docker/setup-buildx-action@v3
 
       # Step 1: cache the heavy duckdb stage
       - name: Cache duckdb-builder stage
-        if: matrix.os == 'ubuntu-latest'
+        if: startsWith(matrix.os, 'ubuntu')
         uses: docker/build-push-action@v7
         with:
           target: duckdb-builder
@@ -57,7 +57,7 @@ jobs:
 
       # Step 2: full build pulling duckdb layers from cache
       - name: Build (Linux)
-        if: matrix.os == 'ubuntu-latest'
+        if: startsWith(matrix.os, 'ubuntu')
         uses: docker/build-push-action@v7
         with:
           platforms: ${{ matrix.platform }}
@@ -65,7 +65,7 @@ jobs:
           cache-from: type=gha,scope=duckdb-builder
 
       - name: Move binary
-        if: matrix.os == 'ubuntu-latest'
+        if: startsWith(matrix.os, 'ubuntu')
         run: |
           echo "=== contents of ./bin ==="
           find ./bin -type f

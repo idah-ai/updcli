@@ -8,4 +8,5 @@ changelog:
       labels: [breaking]
     - title: "🔧 Internal"
       labels: [ci, chore, deps]
-      exclude: true
+exclude:
+  labels: [ci, chore, deps]

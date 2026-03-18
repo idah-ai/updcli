@@ -1,0 +1,11 @@
+changelog:
+  categories:
+    - title: "🚀 Features"
+      labels: [feature, enhancement]
+    - title: "🐛 Bug Fixes"
+      labels: [bug, fix]
+    - title: "⚠️ Breaking Changes"
+      labels: [breaking]
+    - title: "🔧 Internal"
+      labels: [ci, chore, deps]
+      exclude: true

@@ -62,19 +62,18 @@ jobs:
         with:
           target: release
           platforms: ${{ matrix.platform }}
-          outputs: type=local,dest=./bin
+          load: true
+          tags: updcli-release
           cache-from: type=gha,scope=duckdb-builder-${{ matrix.binary }}
 
-      - name: Move binary
+      - name: Extract binary (Linux)
         if: startsWith(matrix.os, 'ubuntu')
         run: |
-          echo "=== contents of ./bin ==="
-          find ./bin -type f
-          mv ./bin/usr/local/bin/updcli ./bin/${{ matrix.binary }} || {
-            echo "Binary not found at expected path. Contents of ./bin:"
-            find ./bin -type f
-            exit 1
-          }
+          mkdir -p ./bin
+          docker create --name extract updcli-release
+          docker cp extract:/usr/local/bin/updcli ./bin/${{ matrix.binary }}
+          docker rm extract
+
       # ---------- macOS (native static build) ----------
       - name: Install Crystal (macOS)
         if: startsWith(matrix.os, 'macos')

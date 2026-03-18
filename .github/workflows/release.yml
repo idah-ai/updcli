@@ -71,7 +71,7 @@ jobs:
         run: |
           mkdir -p ./bin
           docker create --name extract updcli-release
-          docker cp extract:/usr/local/bin/updcli ./bin/${{ matrix.binary }}
+          docker cp extract:/dsb/bin/updcli ./bin/${{ matrix.binary }}
           docker rm extract
 
       # ---------- macOS (native static build) ----------

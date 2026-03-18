@@ -17,28 +17,17 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Step 1: build and cache only the duckdb stage
-      - name: Cache duckdb-builder stage
-        uses: docker/build-push-action@v7
+      - name: Build spec image
+        uses: docker/build-push-action@v6
         with:
-          target: duckdb-builder
-          push: false
-          outputs: type=cacheonly
-          cache-from: type=gha,scope=duckdb-builder-updcli-linux-amd64
-          cache-to: type=gha,mode=max,scope=duckdb-builder-updcli-linux-amd64
-
-      # Step 2: build the full builder stage, pulling duckdb layers from cache
-      - name: Build builder image
-        uses: docker/build-push-action@v7
-        with:
-          target: builder
+          target: spec
           load: true
-          tags: updcli-builder
+          tags: updcli-spec
           cache-from: type=gha,scope=duckdb-builder-updcli-linux-amd64
 
       - name: Run specs
-        run: docker run --rm updcli-builder make spec
+        run: docker run --rm updcli-spec make spec
 
       - name: Run Ameba
-        continue-on-error: true # for now
-        run: docker run --rm updcli-builder bin/ameba src/
+        continue-on-error: true
+        run: docker run --rm updcli-spec bin/ameba src/

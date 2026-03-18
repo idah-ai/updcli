@@ -60,6 +60,7 @@ jobs:
         if: startsWith(matrix.os, 'ubuntu')
         uses: docker/build-push-action@v7
         with:
+          target: release
           platforms: ${{ matrix.platform }}
           outputs: type=local,dest=./bin
           cache-from: type=gha,scope=duckdb-builder-${{ matrix.binary }}

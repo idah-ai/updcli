@@ -91,6 +91,10 @@ COPY Makefile ./
 # Verify the merged library
 RUN echo "=== Merged library size ===" && ls -lh /usr/lib/libduckdb.a
 
+FROM builder AS spec
+
+
+FROM builder AS release
 # Build
 RUN make static
 

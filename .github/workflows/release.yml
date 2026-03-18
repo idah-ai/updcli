@@ -52,8 +52,8 @@ jobs:
         with:
           target: duckdb-builder
           push: false
-          cache-from: type=gha,scope=duckdb-builder
-          cache-to: type=gha,mode=max,scope=duckdb-builder
+          cache-from: type=gha,scope=duckdb-builder-${{ matrix.binary }}
+          cache-to: type=gha,mode=max,scope=duckdb-builder-${{ matrix.binary }}
 
       # Step 2: full build pulling duckdb layers from cache
       - name: Build (Linux)
@@ -62,7 +62,7 @@ jobs:
         with:
           platforms: ${{ matrix.platform }}
           outputs: type=local,dest=./bin
-          cache-from: type=gha,scope=duckdb-builder
+          cache-from: type=gha,scope=duckdb-builder-${{ matrix.binary }}
 
       - name: Move binary
         if: startsWith(matrix.os, 'ubuntu')

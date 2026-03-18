@@ -24,8 +24,8 @@ jobs:
           target: duckdb-builder
           push: false
           outputs: type=cacheonly
-          cache-from: type=gha,scope=duckdb-builder
-          cache-to: type=gha,mode=max,scope=duckdb-builder
+          cache-from: type=gha,scope=duckdb-builder-updcli-linux-amd64
+          cache-to: type=gha,mode=max,scope=duckdb-builder-updcli-linux-amd64
 
       # Step 2: build the full builder stage, pulling duckdb layers from cache
       - name: Build builder image

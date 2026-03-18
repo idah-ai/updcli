@@ -37,7 +37,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # ---------- Linux (Docker static build) ----------
 
@@ -82,7 +82,7 @@ jobs:
       - name: Cache DuckDB (macOS)
         if: startsWith(matrix.os, 'macos')
         id: cache-duckdb
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: duckdb/build/release
           key: duckdb-darwin-${{ matrix.arch }}-${{ env.DUCKDB_VERSION }}
@@ -120,7 +120,7 @@ jobs:
 
       - name: Cache shards (macOS)
         if: startsWith(matrix.os, 'macos')
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/shards
           key: shards-darwin-${{ matrix.arch }}-${{ hashFiles('shard.lock') }}
@@ -140,7 +140,7 @@ jobs:
         run: tar czvf ${{ matrix.binary }}.tar.gz -C bin ${{ matrix.binary }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.binary }}
           path: ${{ matrix.binary }}.tar.gz
@@ -154,7 +154,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download all build artifacts
         uses: actions/download-artifact@v4

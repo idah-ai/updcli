@@ -164,7 +164,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
-          files: artifacts/**/*.tar.gz
+          files: artifacts/*.tar.gz
           generate_release_notes: true
 
       - name: Update latest release

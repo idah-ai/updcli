@@ -21,11 +21,11 @@ jobs:
             platform: linux/amd64
             binary: updcli-linux-amd64
 
-          - os: ubuntu-latest
+          - os: ubuntu-24.04-arm
             platform: linux/arm64
             binary: updcli-linux-arm64
 
-          - os: macos-latest
+          - os: macos-26-intel
             arch: x86_64
             binary: updcli-darwin-amd64
 

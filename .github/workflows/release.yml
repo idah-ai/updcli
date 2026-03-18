@@ -157,6 +157,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts/
+          pattern: updcli-*
           merge-multiple: true
 
       - name: Create versioned release

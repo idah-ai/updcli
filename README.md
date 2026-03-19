@@ -143,7 +143,7 @@ updcli --input my_data.upd dataset delete --id <id>
 updcli --input my_data.upd entry create --dataset_id <ds_id> --url https://example.com/img.jpg
 
 # Create with an embedded media reference
-updcli --input my_data.upd entry create --dataset_id <ds_id> --url updcli://my-photo.jpg
+updcli --input my_data.upd entry create --dataset_id <ds_id> --url local://my-photo.jpg
 
 # Update the URL
 updcli --input my_data.upd entry update --id <id> --url https://new.example.com/img.jpg

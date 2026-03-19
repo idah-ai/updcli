@@ -23,7 +23,7 @@ make build
 make
 ```
 
-The binary is written to `./bin/datset`.
+The binary is written to `./bin/updcli`.
 
 ### Static build (for distribution)
 
@@ -37,7 +37,7 @@ A fully static binary can be built using Docker and Alpine Linux with musl libc.
 make static
 ```
 
-The static binary is extracted to `./bin/datset-static`.
+The static binary is extracted to `./bin/updcli-static`.
 
 > **Note:** The static build compiles DuckDB from scratch, which takes several minutes on first run.
 
@@ -72,7 +72,7 @@ The core schema contains five tables:
 ### Command tree
 
 ```
-datset [--input <file.upd>]
+updcli [--input <file.upd>]
   init                         Initialise a new UPD file
   append [-i <file.jsonl>]     Bulk-import records from a JSONL file
   merge -s <source.upd>        Merge another UPD file into this one
@@ -117,50 +117,50 @@ datset [--input <file.upd>]
 ### Initialise a new file
 
 ```bash
-datset --input my_data.upd init
+updcli --input my_data.upd init
 ```
 
 ### Datasets
 
 ```bash
 # Create
-datset --input my_data.upd dataset create --name "Cats vs Dogs" --modality image
+updcli --input my_data.upd dataset create --name "Cats vs Dogs" --modality image
 
 # List
-datset --input my_data.upd dataset list
+updcli --input my_data.upd dataset list
 
 # Update (partial — only provided fields change)
-datset --input my_data.upd dataset update --id <id> --name "Cats & Dogs"
+updcli --input my_data.upd dataset update --id <id> --name "Cats & Dogs"
 
 # Delete
-datset --input my_data.upd dataset delete --id <id>
+updcli --input my_data.upd dataset delete --id <id>
 ```
 
 ### Entries
 
 ```bash
 # Create with an external URL
-datset --input my_data.upd entry create --dataset_id <ds_id> --url https://example.com/img.jpg
+updcli --input my_data.upd entry create --dataset_id <ds_id> --url https://example.com/img.jpg
 
 # Create with an embedded media reference
-datset --input my_data.upd entry create --dataset_id <ds_id> --url datset://my-photo.jpg
+updcli --input my_data.upd entry create --dataset_id <ds_id> --url updcli://my-photo.jpg
 
 # Update the URL
-datset --input my_data.upd entry update --id <id> --url https://new.example.com/img.jpg
+updcli --input my_data.upd entry update --id <id> --url https://new.example.com/img.jpg
 ```
 
 ### Annotations
 
 ```bash
 # Create a bounding box annotation
-datset --input my_data.upd annotation create \
+updcli --input my_data.upd annotation create \
   --entry_id <entry_id> \
   --type bbox \
   --shape '{"x":10,"y":20,"w":100,"h":80}' \
   --annotation '{"label":"cat","score":0.95}'
 
 # Update just the annotation value
-datset --input my_data.upd annotation update --id <ann_id> \
+updcli --input my_data.upd annotation update --id <ann_id> \
   --annotation '{"label":"dog","score":0.87}'
 ```
 
@@ -168,17 +168,17 @@ datset --input my_data.upd annotation update --id <ann_id> \
 
 ```bash
 # Import a file (MIME type auto-detected from extension)
-datset --input my_data.upd media create --file ./photo.jpg
+updcli --input my_data.upd media create --file ./photo.jpg
 
 # Import with a specific key (for multi-resolution variants)
-datset --input my_data.upd media create --file ./photo.jpg --id photo-001 --key full
-datset --input my_data.upd media create --file ./thumb.jpg --id photo-001 --key thumbnail
+updcli --input my_data.upd media create --file ./photo.jpg --id photo-001 --key full
+updcli --input my_data.upd media create --file ./thumb.jpg --id photo-001 --key thumbnail
 
 # Extract back to disk
-datset --input my_data.upd media extract --id <id> --output ./recovered.jpg
+updcli --input my_data.upd media extract --id <id> --output ./recovered.jpg
 
 # Update blob content
-datset --input my_data.upd media update --id <id> --key full --file ./new_photo.jpg
+updcli --input my_data.upd media update --id <id> --key full --file ./new_photo.jpg
 ```
 
 ### Bulk import (JSONL)
@@ -193,10 +193,10 @@ The `append` command reads [JSONL](https://jsonlines.org/) from a file or stdin.
 
 ```bash
 # From a file
-datset --input my_data.upd append --input records.jsonl
+updcli --input my_data.upd append --input records.jsonl
 
 # From stdin
-cat records.jsonl | datset --input my_data.upd append
+cat records.jsonl | updcli --input my_data.upd append
 ```
 
 The entire operation runs in a single transaction — if any line fails, everything is rolled back.
@@ -207,10 +207,10 @@ Combine two UPD files into one. The `--input` file is the **target**; `--source`
 
 ```bash
 # Merge source.upd into target.upd, skipping any conflicting records (default)
-datset --input target.upd merge --source source.upd
+updcli --input target.upd merge --source source.upd
 
 # Merge and overwrite conflicts with the source version
-datset --input target.upd merge --source source.upd --strategy overwrite
+updcli --input target.upd merge --source source.upd --strategy overwrite
 ```
 
 **Strategies:**
@@ -230,19 +230,19 @@ openssl ecparam -name prime256v1 -genkey -noout -out key.pem
 openssl req -new -x509 -key key.pem -out cert.pem -days 365
 
 # Sign all datasets
-datset --input my_data.upd sign --key key.pem --cert cert.pem
+updcli --input my_data.upd sign --key key.pem --cert cert.pem
 
 # Sign a specific dataset
-datset --input my_data.upd sign --key key.pem --cert cert.pem --dataset <ds_id>
+updcli --input my_data.upd sign --key key.pem --cert cert.pem --dataset <ds_id>
 
 # Sign with flavor tables included
-datset --input my_data.upd sign --key key.pem --cert cert.pem --flavor-tables custom_table
+updcli --input my_data.upd sign --key key.pem --cert cert.pem --flavor-tables custom_table
 
 # Verify all signatures
-datset --input my_data.upd verify
+updcli --input my_data.upd verify
 
 # Strict mode (validates certificate expiry)
-datset --input my_data.upd verify --strict
+updcli --input my_data.upd verify --strict
 ```
 
 Signatures are stored as JSON in the `metadata` column of each dataset under the `Content-Signature` key. The signing process follows the UPD RFC Section 5.4/5.5 canonical serialisation rules to ensure deterministic, reproducible hashes.

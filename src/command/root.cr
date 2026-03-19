@@ -9,23 +9,27 @@ require "./sign"
 require "./verify"
 require "./merge"
 
+VERSION = {{ read_file("#{__DIR__}/../../VERSION").chomp }}
+
 module Command
   class Root < Base
     description "updcli: A command-line tool for managing Universal Portable Datasets (UPD)."
     option "input", "i",
       "Path to the input UPD file.",
-      required: true,
       type: :string
-    sub_command "init", Init
+    option "version", "v",
+      "Print version and exit.",
+      type: :bool
+    sub_command "annotation", Annotation::Root
     sub_command "append", Append
     sub_command "dataset", Dataset::Root
-    sub_command "media", Media::Root
     sub_command "entry", Entry::Root
-    sub_command "annotation", Annotation::Root
+    sub_command "init", Init
+    sub_command "media", Media::Root
+    sub_command "merge", Merge
     sub_command "metadata", Metadata::Root
     sub_command "sign", Sign
     sub_command "verify", Verify
-    sub_command "merge", Merge
 
     property! database : DB::Connection
 
@@ -38,6 +42,15 @@ module Command
     end
 
     def run
+      if option("version") == "true"
+        puts(VERSION)
+        return
+      end
+
+      unless option("input")
+        error!("Missing required option: --input <file>")
+      end
+
       with_db do |database|
         @database = database
         super

@@ -1,11 +1,11 @@
-name: datset
+name: updcli
 version: 0.1.0
 
 authors:
   - Yacine Petitprez <anykeyh@gmail.com>
 
 # description: |
-#   Short description of datset
+#   Short description of updcli
 
 dependencies:
   duckdb:
@@ -20,7 +20,7 @@ development_dependencies:
 
 targets:
   updcli:
-    main: src/datset.cr
+    main: src/main.cr
   ameba:
     main: bin/ameba.cr
 

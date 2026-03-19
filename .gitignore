@@ -2,5 +2,6 @@
 *.upd
 lib
 lib/*
+bin/*
 
 .vscode

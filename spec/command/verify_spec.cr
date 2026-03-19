@@ -97,7 +97,7 @@ module VerifySpecHelpers
   def self.add_data_to_dataset(db_path, dataset_id)
     # Add data to dataset to invalidate signatures
     DB.open("duckdb://#{db_path}") do |db|
-      db.exec("INSERT INTO entries VALUES ('entry-1', ?, 'datset://media-1', '{}')", dataset_id)
+      db.exec("INSERT INTO entries VALUES ('entry-1', ?, 'local://media-1', '{}')", dataset_id)
       db.close
     end
   end

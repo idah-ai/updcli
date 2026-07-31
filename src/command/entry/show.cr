@@ -14,7 +14,7 @@ module Command
           {
             id:        entry.read(String),
             media_url: entry.read(String),
-            metadata:  JSON.parse(entry.read(String))
+            metadata:  entry.read(String).try { |str| JSON.parse(str) }
           }
         end
 

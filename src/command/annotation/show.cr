@@ -17,7 +17,7 @@ module Command
             shape_type: ann.read(String),
             annotation: JSON.parse(ann.read(String)),
             shape_args: JSON.parse(ann.read(String)),
-            metadata:   JSON.parse(ann.read(String)),
+            metadata:   ann.read(String).try { |str| JSON.parse(str) }
           }
         end
 

@@ -8,12 +8,13 @@ module Command
 
       def run_impl
         entries = root.database.query_all(
-          "SELECT id, media_url FROM entries WHERE id = ?",
+          "SELECT id, media_url, metadata FROM entries WHERE id = ?",
           option("id")
         ) do |entry|
           {
             id:        entry.read(String),
             media_url: entry.read(String),
+            metadata:  JSON.parse(entry.read(String))
           }
         end
 

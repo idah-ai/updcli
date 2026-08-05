@@ -23,8 +23,9 @@ module Command
         current_type, current_shape, current_annotation, current_metadata = row
 
         shape_args = if (shape_option = option("shape"))
+          resolved_shape = shape_option.starts_with?("@") ? File.read(shape_option[1..]) : shape_option
           begin
-            JSON.parse(shape_option).to_json
+            JSON.parse(resolved_shape).to_json
           rescue ex : JSON::ParseException
             raise Command::UpdError.new("Invalid JSON in new shape: #{ex.message}", self)
           end

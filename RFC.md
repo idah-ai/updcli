@@ -71,7 +71,7 @@ Keys **ARE RECOMMENDED TO** follow the `Camel-Case-With-Hyphens` convention (e.g
 |-----|--------|-------------|
 | `Authored-By` | **OPTIONAL** | Email of the Actor or URL of the organization who created/maintained the UPD file. |
 | `Schema-Type` | **REQUIRED** | **MUST** be set to `"Universal Portable Dataset"`. |
-| `Schema-Version` | **REQUIRED** | The version of the UPD Core Schema (e.g., `"1.0"`). |
+| `Schema-Version` | **REQUIRED** | The version of the UPD Core Schema (e.g., `"1.1"`). |
 | `Schema-Built-By` | **RECOMMENDED** | Identifies the tool and version that created the file (e.g., `"updcli v1.0.0"`). |
 | `Schema-Flavor` | **OPTIONAL** | The name of any standardized extension applied. **SHOULD** be `"Vanilla"` by default. |
 | `Schema-Flavor-URL` | **OPTIONAL** | When not `"Vanilla"`, a URL pointing to the flavor documentation. |
@@ -195,7 +195,8 @@ CREATE TABLE IF NOT EXISTS annotations (
     entry_id VARCHAR NOT NULL REFERENCES entries(id) ON DELETE RESTRICT,
     shape_type VARCHAR NOT NULL CHECK(length(shape_type) <= 64),
     shape_args VARCHAR NOT NULL,  -- JSON stored as VARCHAR (e.g., bounding box coordinates)
-    annotation VARCHAR NOT NULL,  -- JSON stored as VARCHAR (e.g., class labels, confidence scores)
+    category VARCHAR NOT NULL,    -- Single classification value for the annotation (e.g., a class label)
+    properties VARCHAR NOT NULL DEFAULT '{}',  -- Opaque, vendor-defined JSON blob (e.g., confidence scores)
     metadata VARCHAR DEFAULT '{}'  -- JSON stored as VARCHAR (lifecycle info)
 );
 
@@ -211,13 +212,16 @@ CREATE INDEX IF NOT EXISTS idx_annotations_shape_type ON annotations (shape_type
 
 - **`shape_type`:** **SHOULD** use vendor-prefixed strings (e.g., `"idah-video-bounding-box"`, `"acme-polygon"`, `"vendor-point"`). It is the vendor's responsibility to document the expected `shape_args` format for each shape type.
 - **`shape_args`:** **MUST** be a JSON string defining the shape parameters. The structure is vendor-specific and tied to the `shape_type`.
+- **`category`:** A single classification value for the annotation. It is a **Core** (not Flavor) field, it is **`NOT NULL`**, and every annotation is expected to always carry exactly one classification value. This is an intentional Core design decision — the UPD Core schema deliberately reserves a single, dedicated classification column rather than leaving classification entirely to vendor-defined JSON. Free-form scores or other annotation-specific metadata do **NOT** belong here; they belong in `properties`.
+- **`properties`:** An opaque, vendor-defined JSON blob (e.g., confidence scores, additional attributes). It carries the same semantics the former `annotation` column had, but no longer nests a classification key inside it — classification is expressed by the dedicated `category` column.
 
 **Example:**
 ```json
 {
   "shape_type": "idah-bounding-box",
   "shape_args": "{\"x\": 100, \"y\": 200, \"width\": 50, \"height\": 75}",
-  "annotation": "{\"class\": \"person\", \"confidence\": 0.95}"
+  "category": "person",
+  "properties": "{\"confidence\": 0.95}"
 }
 ```
 
@@ -391,9 +395,9 @@ Assume we are signing dataset `ds-001` which has the following data:
 | `e-001` | `ds-001` | `https://example.com/img.jpg` | `{"cby":"alice"}` |
 
 **`annotations` table (filtered to entries in `ds-001`):**
-| id | entry_id | shape_type | shape_args | annotation | metadata |
-|---|---|---|---|---|---|
-| `a-001` | `e-001` | `box` | `{"x":0}` | `{"class":"cat"}` | `{}` |
+| id | entry_id | shape_type | shape_args | category | properties | metadata |
+|---|---|---|---|---|---|---|
+| `a-001` | `e-001` | `box` | `{"x":0}` | `cat` | `{}` | `{}` |
 
 **Serialization Process:**
 
@@ -409,13 +413,13 @@ Assume we are signing dataset `ds-001` which has the following data:
   [row e-002: id] COL [dataset_id] COL [media_url] COL [metadata]
 TABLE
 [annotations table]
-  [row a-001: id] COL [entry_id] COL [shape_type] COL [shape_args] COL [annotation] COL [metadata]
+  [row a-001: id] COL [entry_id] COL [shape_type] COL [shape_args] COL [category] COL [properties] COL [metadata]
 ```
 
 **Resulting Byte Stream (Actual, with hex for delimiters):**
 
 ```
-e-001\x00COL\x00ds-001\x00COL\x00https://example.com/img.jpg\x00COL\x00{"cby":"alice"}\x00ROW\x00e-002\x00COL\x00ds-001\x00COL\x00local:m-002\x00COL\x00{"cby":"bob"}\x00TABLE\x00a-001\x00COL\x00e-001\x00COL\x00box\x00COL\x00{"x":0}\x00COL\x00{"class":"cat"}\x00COL\x00{}
+e-001\x00COL\x00ds-001\x00COL\x00https://example.com/img.jpg\x00COL\x00{"cby":"alice"}\x00ROW\x00e-002\x00COL\x00ds-001\x00COL\x00local:m-002\x00COL\x00{"cby":"bob"}\x00TABLE\x00a-001\x00COL\x00e-001\x00COL\x00box\x00COL\x00{"x":0}\x00COL\x00cat\x00COL\x00{}\x00COL\x00{}
 ```
 
 This entire byte sequence is then hashed using the algorithm specified in `dataHashAlgorithm` to produce the `dataHash`.
@@ -432,7 +436,7 @@ The `schemaHash` is computed by:
 
 **Example:**
 ```sql
-CREATE TABLE annotations (id VARCHAR NOT NULL PRIMARY KEY CHECK(length(id) <= 64), entry_id VARCHAR NOT NULL REFERENCES entries(id) ON DELETE RESTRICT, shape_type VARCHAR NOT NULL CHECK(length(shape_type) <= 64), shape_args VARCHAR NOT NULL, annotation VARCHAR NOT NULL, metadata VARCHAR DEFAULT '{}');
+CREATE TABLE annotations (id VARCHAR NOT NULL PRIMARY KEY CHECK(length(id) <= 64), entry_id VARCHAR NOT NULL REFERENCES entries(id) ON DELETE RESTRICT, shape_type VARCHAR NOT NULL CHECK(length(shape_type) <= 64), shape_args VARCHAR NOT NULL, category VARCHAR NOT NULL, properties VARCHAR NOT NULL DEFAULT '{}', metadata VARCHAR DEFAULT '{}');
 CREATE TABLE entries (id VARCHAR NOT NULL PRIMARY KEY CHECK(length(id) <= 64), dataset_id VARCHAR NOT NULL REFERENCES datasets(id) ON DELETE RESTRICT, media_url VARCHAR NOT NULL, metadata VARCHAR DEFAULT '{}');
 ```
 
@@ -490,7 +494,7 @@ updcli --db=<file.upd> verify --dataset=<dataset_id>
 | key | value |
 |-----|-------|
 | `Schema-Type` | `"Universal Portable Dataset"` |
-| `Schema-Version` | `"1.0"` |
+| `Schema-Version` | `"1.1"` |
 | `Schema-Flavor` | `"Vanilla"` |
 
 **Datasets:**
@@ -590,6 +594,12 @@ Future specifications may define streaming protocols for accessing UPD files ove
 ---
 
 ## 10. Changelog
+
+### Version 1.1 (Schema-Version `"1.1"`)
+- Promoted the annotation classification value from a nested key inside the opaque `annotation` JSON blob to a dedicated `category` column in the `annotations` table.
+- Renamed the `annotation` column to `properties`. It keeps the same semantics as before — an opaque, vendor-defined JSON blob — but no longer carries a nested classification key inside it.
+- This is a **breaking schema change**: the `annotations` table now has columns `id, entry_id, shape_type, shape_args, category, properties, metadata` (in `CREATE TABLE` ordinal order).
+- Because `schemaHash` is computed from whatever `CREATE TABLE` statements are present in a given file (see §5.3.1/§5.5), this change alters the reference `schemaHash` for the Core schema. It does **not** invalidate already-signed files, but any external tooling that pins/hardcodes a reference hash for "the official Core schema" must be updated to the new value.
 
 ### Version 0.2 Beta (November 2025)
 - Clarified that UPD is a container format and does not define data semantics

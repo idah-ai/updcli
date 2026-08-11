@@ -38,7 +38,7 @@ module Command
 
         # 3. Annotations (depends on entries)
         annotations_merged = merge_table(db, insert_verb, "annotations",
-          "SELECT id, entry_id, shape_type, shape_args, annotation, metadata FROM merge_source.annotations")
+          "SELECT id, entry_id, shape_type, shape_args, category, properties, metadata FROM merge_source.annotations")
 
         # 4. Medias (composite PK, no FK)
         medias_merged = merge_table(db, insert_verb, "medias",

@@ -9,13 +9,14 @@ module Command
 
       def run_impl
         annotations = root.database.query_all(
-          "SELECT id, shape_type, annotation, shape_args FROM annotations WHERE ID = ?", option("id")
+          "SELECT id, shape_type, shape_args, category, properties FROM annotations WHERE ID = ?", option("id")
         ) do |ann|
           {
             id:         ann.read(String),
             shape_type: ann.read(String),
-            annotation: JSON.parse(ann.read(String)),
             shape_args: JSON.parse(ann.read(String)),
+            category:   ann.read(String),
+            properties: JSON.parse(ann.read(String)),
           }
         end
 

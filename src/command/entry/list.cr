@@ -6,10 +6,11 @@ module Command
       description "List the entries"
 
       def run_impl
-        entries = root.database.query_all("SELECT id, media_url FROM entries") do |entry|
+        entries = root.database.query_all("SELECT id, media_url, metadata FROM entries") do |entry|
           {
             id:        entry.read(String),
             media_url: entry.read(String),
+            metadata:  entry.read(String).try { |str| JSON.parse(str) }
           }
         end
 

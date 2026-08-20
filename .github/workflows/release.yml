@@ -77,7 +77,7 @@ jobs:
       # ---------- macOS (native static build) ----------
       - name: Install Crystal (macOS)
         if: startsWith(matrix.os, 'macos')
-        run: brew install crystal
+        run: brew install crystal@1.16
 
       - name: Cache DuckDB (macOS)
         if: startsWith(matrix.os, 'macos')
@@ -129,7 +129,7 @@ jobs:
       - name: Build binary (macOS)
         if: startsWith(matrix.os, 'macos')
         run: |
-          shards install
+          shards install --without-development
           crystal build --release \
             --link-flags="-L$(pwd)/duckdb/build/release -lduckdb -lstdc++ -lm -lpthread" \
             src/main.cr -o bin/${{ matrix.binary }}

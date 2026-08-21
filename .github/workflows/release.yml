@@ -129,6 +129,7 @@ jobs:
       - name: Build binary (macOS)
         if: startsWith(matrix.os, 'macos')
         run: |
+          mkdir -p bin
           shards install --without-development
           crystal build --release \
             --link-flags="-L$(pwd)/duckdb/build/release -lduckdb -lstdc++ -lm -lpthread" \

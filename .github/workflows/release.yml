@@ -77,7 +77,7 @@ jobs:
       # ---------- macOS (native static build) ----------
       - name: Install Crystal (macOS)
         if: startsWith(matrix.os, 'macos')
-        run: brew install crystal@1.16
+        run: brew install crystal
 
       - name: Cache DuckDB (macOS)
         if: startsWith(matrix.os, 'macos')

@@ -13,13 +13,19 @@ module Command
       option "metadata", "h", "metadata", required: false, type: :string
 
       def run_impl
+        shape_value = option("shape") || ""
+        if shape_value.starts_with?("@")
+          shape_path = shape_value[1..]
+          shape_value = File.read(shape_path)
+        end
+
         result = root.database.exec(
           "INSERT into annotations values (?, ?, ?, ?, ?, ?, ?)", # ?,...
           args: [
           option("id") || UUID.v7.to_s,
           option("entry_id"),
           option("type"),
-          JSON.parse(option("shape") || "").to_json,
+          JSON.parse(shape_value).to_json,
           option("category"),
           JSON.parse(option("properties") || "{}").to_json,
           option("metadata") || {

@@ -196,8 +196,53 @@ describe "Command::Annotation" do
           Command::Argument.new("create", :pos, nil),
           Command::Argument.new("entry_id", :optlong, "e-1"),
           Command::Argument.new("type", :optlong, "bbox"),
-          Command::Argument.new("shape", :optlong, "{\"x\":0}"),
-          Command::Argument.new("properties", :optlong, "{}"),
+          Command::Argument.new("shape", :optlong, "{}"),
+        ]).run
+      end
+      DB.open("duckdb://test.upd") do |db|
+        count = db.query_one("SELECT COUNT(*) FROM annotations", as: Int64)
+        count.should eq(0)
+        db.close
+      end
+    end
+
+    it "creates an annotation with shape from file using @file syntax" do
+      File.write("test_shape.json", "{\"x\":10,\"y\":20,\"w\":200,\"h\":150}")
+
+      Command::Root.new([
+        Command::Argument.new("input", :optlong, "test.upd"),
+        Command::Argument.new("annotation", :pos, nil),
+        Command::Argument.new("create", :pos, nil),
+        Command::Argument.new("entry_id", :optlong, "e-1"),
+        Command::Argument.new("type", :optlong, "bbox"),
+        Command::Argument.new("shape", :optlong, "@test_shape.json"),
+        Command::Argument.new("category", :optlong, "car"),
+        Command::Argument.new("properties", :optlong, "{}")
+      ]).run
+
+      DB.open("duckdb://test.upd") do |db|
+        shape_args = JSON.parse(db.query_one("SELECT shape_args FROM annotations", as: String))
+        shape_args["x"].as_i.should eq(10)
+        shape_args["y"].as_i.should eq(20)
+        shape_args["w"].as_i.should eq(200)
+        shape_args["h"].as_i.should eq(150)
+        db.close
+      end
+    ensure
+      File.delete("test_shape.json") if File.exists?("test_shape.json")
+    end
+
+    it "raises when @file shape file does not exist" do
+      expect_raises(File::NotFoundError) do
+        Command::Root.new([
+          Command::Argument.new("input", :optlong, "test.upd"),
+          Command::Argument.new("annotation", :pos, nil),
+          Command::Argument.new("create", :pos, nil),
+          Command::Argument.new("entry_id", :optlong, "e-1"),
+          Command::Argument.new("type", :optlong, "bbox"),
+          Command::Argument.new("shape", :optlong, "@nonexistent_shape.json"),
+          Command::Argument.new("category", :optlong, "car"),
+          Command::Argument.new("properties", :optlong, "{}")
         ]).run
       end
 
@@ -206,6 +251,25 @@ describe "Command::Annotation" do
         count.should eq(0)
         db.close
       end
+    end
+
+    it "raises when @file shape contains invalid JSON" do
+      File.write("test_bad_shape.json", "not valid json")
+
+      expect_raises(JSON::ParseException) do
+        Command::Root.new([
+          Command::Argument.new("input", :optlong, "test.upd"),
+          Command::Argument.new("annotation", :pos, nil),
+          Command::Argument.new("create", :pos, nil),
+          Command::Argument.new("entry_id", :optlong, "e-1"),
+          Command::Argument.new("type", :optlong, "bbox"),
+          Command::Argument.new("shape", :optlong, "@test_bad_shape.json"),
+          Command::Argument.new("category", :optlong, "car"),
+          Command::Argument.new("properties", :optlong, "{}")
+        ]).run
+      end
+    ensure
+      File.delete("test_bad_shape.json") if File.exists?("test_bad_shape.json")
     end
   end
 
@@ -409,6 +473,34 @@ describe "Command::Annotation" do
         shape_args["y"].as_i.should eq(20)
         db.close
       end
+    end
+
+    it "updates shape_args from file using @file syntax" do
+      DB.open("duckdb://test.upd") do |db|
+        db.exec("INSERT INTO annotations VALUES ('a-1', 'e-1', 'bbox', '{\"x\":0}', 'cat', '{}', '{}')")
+        db.close
+      end
+
+      File.write("test_update_shape.json", "{\"x\":99,\"y\":88,\"w\":300,\"h\":250}")
+
+      Command::Root.new([
+        Command::Argument.new("input", :optlong, "test.upd"),
+        Command::Argument.new("annotation", :pos, nil),
+        Command::Argument.new("update", :pos, nil),
+        Command::Argument.new("id", :optlong, "a-1"),
+        Command::Argument.new("shape", :optlong, "@test_update_shape.json"),
+      ]).run
+
+      DB.open("duckdb://test.upd") do |db|
+        shape_args = JSON.parse(db.query_one("SELECT shape_args FROM annotations WHERE id = 'a-1'", as: String))
+        shape_args["x"].as_i.should eq(99)
+        shape_args["y"].as_i.should eq(88)
+        shape_args["w"].as_i.should eq(300)
+        shape_args["h"].as_i.should eq(250)
+        db.close
+      end
+    ensure
+      File.delete("test_update_shape.json") if File.exists?("test_update_shape.json")
     end
 
     it "updates the properties value" do

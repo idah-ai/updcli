@@ -92,7 +92,7 @@ updcli [--input <file.upd>]
     delete -i <id>                   Delete an entry
 
   annotation
-    create -e <entry_id> -t <type> -s <shape_json> -a <annotation_json>
+    create -e <entry_id> -t <type> -s <shape_json> -c <category> -p <properties_json>
     list
     show -i <id>
     update -i <id>
@@ -157,11 +157,16 @@ updcli --input my_data.upd annotation create \
   --entry_id <entry_id> \
   --type bbox \
   --shape '{"x":10,"y":20,"w":100,"h":80}' \
-  --annotation '{"label":"cat","score":0.95}'
+  --category cat \
+  --properties '{"score":0.95}'
 
-# Update just the annotation value
+# Update just the properties value
 updcli --input my_data.upd annotation update --id <ann_id> \
-  --annotation '{"label":"dog","score":0.87}'
+  --properties '{"score":0.87}'
+
+# Update the category
+updcli --input my_data.upd annotation update --id <ann_id> \
+  --category dog
 ```
 
 ### Media blobs
@@ -188,7 +193,7 @@ The `append` command reads [JSONL](https://jsonlines.org/) from a file or stdin.
 ```jsonl
 {"command":"dataset:create","args":{"name":"My Dataset","modality":"image"}}
 {"command":"entry:create","args":{"dataset_id":"<ds_id>","url":"https://example.com/1.jpg"}}
-{"command":"annotation:create","args":{"entry_id":"<e_id>","type":"bbox","shape":"{\"x\":0}","annotation":"{\"label\":\"cat\"}"}}
+{"command":"annotation:create","args":{"entry_id":"<e_id>","type":"bbox","shape":"{\"x\":0}","category":"cat","properties":"{}"}}
 ```
 
 ```bash

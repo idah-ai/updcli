@@ -36,7 +36,13 @@ module Command
         ]
         )
 
-        Log.info { result }
+        info_log = "#{result} -- file_path : #{option("file")}"
+
+        if option("id")
+          info_log += " , id: #{option("id")}"
+        end
+
+        Log.info { info_log }
       end
     end
   end

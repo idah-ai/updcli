@@ -8,19 +8,20 @@ module Command
       option "id", "i", "Annotation ID", required: true, type: :string
       option "type", "t", "New shape_type", required: false, type: :string
       option "shape", "s", "New shape_args (JSON)", required: false, type: :string
-      option "annotation", "a", "New annotation value (JSON)", required: false, type: :string
+      option "category", "c", "New annotation category", required: false, type: :string
+      option "properties", "p", "New annotation properties (JSON)", required: false, type: :string
       option "metadata", "h", "New metadata (JSON object)", required: false, type: :string
 
       def run_impl
         row = root.database.query_one?(
-          "SELECT shape_type, shape_args, annotation, metadata FROM annotations WHERE id = ?",
+          "SELECT shape_type, shape_args, category, properties, metadata FROM annotations WHERE id = ?",
           option("id"),
-          as: {String, String, String, String}
+          as: {String, String, String, String, String}
         )
 
         raise Command::UpdError.new("Annotation '#{option("id")}' not found", self) unless row
 
-        current_type, current_shape, current_annotation, current_metadata = row
+        current_type, current_shape, current_category, current_properties, current_metadata = row
 
         shape_args = if (shape_option = option("shape"))
           resolved_shape = shape_option.starts_with?("@") ? File.read(shape_option[1..]) : shape_option
@@ -33,14 +34,16 @@ module Command
           current_shape
         end
 
-        annotation_val = if (annotation_option = option("annotation"))
+        category_val = option("category") || current_category
+
+        properties_val = if (properties_option = option("properties"))
           begin
-            JSON.parse(annotation_option).to_json
+            JSON.parse(properties_option).to_json
           rescue ex : JSON::ParseException
-            raise Command::UpdError.new("Invalid JSON in new annotation: #{ex.message}", self)
+            raise Command::UpdError.new("Invalid JSON in new properties: #{ex.message}", self)
           end
         else
-          current_annotation
+          current_properties
         end
 
         metadata_option = option("metadata")
@@ -62,11 +65,12 @@ module Command
         metadata["Updated-By"] = JSON::Any.new("updcli")
 
         result = root.database.exec(
-          "UPDATE annotations SET shape_type = ?, shape_args = ?, annotation = ?, metadata = ? WHERE id = ?",
+          "UPDATE annotations SET shape_type = ?, shape_args = ?, category = ?, properties = ?, metadata = ? WHERE id = ?",
           args: [
             option("type") || current_type,
             shape_args,
-            annotation_val,
+            category_val,
+            properties_val,
             metadata.to_json,
             option("id")
           ]

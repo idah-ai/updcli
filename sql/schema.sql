@@ -40,7 +40,8 @@ CREATE TABLE IF NOT EXISTS annotations (
     entry_id VARCHAR NOT NULL REFERENCES entries(id) ON DELETE RESTRICT,
     shape_type VARCHAR NOT NULL CHECK(length(shape_type) <= 64), -- Shape of the annotation, e.g., bounding_box, segmentation
     shape_args VARCHAR NOT NULL,  -- Parameters defining the annotation's shape, ex: [x1, y1, x2, y2]
-    annotation VARCHAR NOT NULL,
+    category VARCHAR NOT NULL,     -- Single classification value for the annotation, e.g., a class label
+    properties VARCHAR NOT NULL DEFAULT '{}', -- Opaque, vendor-defined JSON blob (e.g., confidence scores)
     metadata VARCHAR DEFAULT '{}' -- Other metadata, such as creator, timestamp, comments... VARCHAR format
 );
 
@@ -59,7 +60,7 @@ CREATE TABLE IF NOT EXISTS metadata (
 -- Insert default global metadata
 INSERT INTO metadata (key, value) VALUES
   ('Schema-Type', '"Universal Portable Dataset"'),
-  ('Schema-Version', '"1.0"'),
+  ('Schema-Version', '"1.1"'),
   ('Schema-Built-By', '"updcli v1.0"'),
   ('Schema-Flavor', '"None"')
 ON CONFLICT (key) DO UPDATE SET value = excluded.value;

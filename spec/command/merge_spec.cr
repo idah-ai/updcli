@@ -123,7 +123,7 @@ describe "Command::Merge" do
       DB.open("duckdb://source.upd") do |db|
         db.exec("INSERT INTO datasets VALUES ('ds-1', 'Dataset', 'image', '{}')")
         db.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'https://example.com/img.jpg', '{}')")
-        db.exec("INSERT INTO annotations VALUES ('a-1', 'e-1', 'bbox', '{\"x\":0}', '{\"label\":\"cat\"}', '{}')")
+        db.exec("INSERT INTO annotations VALUES ('a-1', 'e-1', 'bbox', '{\"x\":0}', 'cat', '{}', '{}')")
         db.close
       end
 
@@ -136,9 +136,10 @@ describe "Command::Merge" do
       DB.open("duckdb://target.upd") do |db|
         count = db.query_one("SELECT COUNT(*) FROM annotations WHERE id = 'a-1'", as: Int64)
         count.should eq(1)
-        row = db.query_one("SELECT shape_type, annotation FROM annotations WHERE id = 'a-1'", as: {String, String})
+        row = db.query_one("SELECT shape_type, category, properties FROM annotations WHERE id = 'a-1'", as: {String, String, String})
         row[0].should eq("bbox")
-        JSON.parse(row[1])["label"].as_s.should eq("cat")
+        row[1].should eq("cat")
+        JSON.parse(row[2]).should eq(JSON.parse("{}"))
         db.close
       end
     end
@@ -306,8 +307,8 @@ describe "Command::Merge" do
         db.exec("INSERT INTO datasets VALUES ('ds-1', 'Dataset', 'image', '{}')")
         db.exec("INSERT INTO entries VALUES ('e-1', 'ds-1', 'https://example.com/img.jpg', '{}')")
         db.exec("INSERT INTO entries VALUES ('e-2', 'ds-1', 'https://example.com/img2.jpg', '{}')")
-        db.exec("INSERT INTO annotations VALUES ('a-1', 'e-1', 'bbox', '{\"x\":0}', '{\"label\":\"cat\"}', '{}')")
-        db.exec("INSERT INTO annotations VALUES ('a-2', 'e-2', 'bbox', '{\"x\":10}', '{\"label\":\"dog\"}', '{}')")
+        db.exec("INSERT INTO annotations VALUES ('a-1', 'e-1', 'bbox', '{\"x\":0}', 'cat', '{}', '{}')")
+        db.exec("INSERT INTO annotations VALUES ('a-2', 'e-2', 'bbox', '{\"x\":10}', 'dog', '{}', '{}')")
         db.exec("INSERT INTO medias VALUES ('m-1', '', ?, 'image/jpeg', '{}')", "blob".to_slice)
         db.close
       end
@@ -357,7 +358,7 @@ describe "Command::Merge" do
       DB.open("duckdb://source.upd") do |db|
         db.exec("CREATE TABLE datasets (id VARCHAR PRIMARY KEY, name VARCHAR, modality VARCHAR, metadata VARCHAR DEFAULT '{}')")
         db.exec("CREATE TABLE entries  (id VARCHAR PRIMARY KEY, dataset_id VARCHAR, media_url VARCHAR, metadata VARCHAR DEFAULT '{}')")
-        db.exec("CREATE TABLE annotations (id VARCHAR PRIMARY KEY, entry_id VARCHAR, shape_type VARCHAR, shape_args VARCHAR, annotation VARCHAR, metadata VARCHAR DEFAULT '{}')")
+        db.exec("CREATE TABLE annotations (id VARCHAR PRIMARY KEY, entry_id VARCHAR, shape_type VARCHAR, shape_args VARCHAR, category VARCHAR, properties VARCHAR DEFAULT '{}', metadata VARCHAR DEFAULT '{}')")
         db.exec("CREATE TABLE medias (id VARCHAR NOT NULL, key VARCHAR NOT NULL, blob_data BLOB, media_type VARCHAR, metadata VARCHAR DEFAULT '{}', PRIMARY KEY (id, key))")
         db.exec("INSERT INTO datasets VALUES ('ds-1', 'Dataset', 'image', '{}')")
         # This entry points to a dataset that does NOT exist in the target
